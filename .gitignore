@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+frontend/dist/
+frontend/build/
+
+# Python virtual environment
+nlp-engine/venv/
+nlp-engine/.venv/
+
+# Models (too large for git)
+nlp-engine/models/saved/*.bin
+nlp-engine/models/saved/*.pt
+nlp-engine/models/embeddings/*.faiss
+nlp-engine/models/embeddings/*.index
+
+# Logs
+*.log
+logs/
+
+# Data (optional - may want to include sample data)
+nlp-engine/data/raw/*.csv
+
+# Coverage
+coverage/
+.nyc_output/
+htmlcov/
+
+# Misc
+*.bak
+*.tmp

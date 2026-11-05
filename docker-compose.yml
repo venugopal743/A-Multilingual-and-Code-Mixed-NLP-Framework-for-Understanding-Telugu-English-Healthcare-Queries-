@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7
+    container_name: healthcare-nlp-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: healthcare_nlp
+    networks:
+      - healthcare-nlp-network
+
+  # Node.js Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: healthcare-nlp-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/healthcare_nlp
+      - JWT_SECRET=${JWT_SECRET:-change-this-secret}
+      - NLP_ENGINE_URL=http://nlp-engine:8000
+      - NODE_ENV=production
+    depends_on:
+      - mongodb
+      - nlp-engine
+    networks:
+      - healthcare-nlp-network
+
+  # Python NLP Engine
+  nlp-engine:
+    build:
+      context: ./nlp-engine
+      dockerfile: Dockerfile
+    container_name: healthcare-nlp-engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./datasets:/app/datasets:ro
+      - nlp_models:/app/models
+    environment:
+      - DATA_DIR=/app/datasets
+      - MODEL_DIR=/app/models/saved
+      - FAISS_INDEX_PATH=/app/models/embeddings/medical_index.faiss
+    networks:
+      - healthcare-nlp-network
+
+  # React Frontend (development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: healthcare-nlp-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    networks:
+      - healthcare-nlp-network
+
+volumes:
+  mongodb_data:
+  nlp_models:
+
+networks:
+  healthcare-nlp-network:
+    driver: bridge
