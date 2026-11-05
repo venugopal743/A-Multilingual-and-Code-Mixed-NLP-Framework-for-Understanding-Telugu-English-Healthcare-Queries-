@@ -1,26 +1,25 @@
 /**
  * @file api.js
- * @description Axios instance and API service functions for communicating
- *              with the Flask backend and FastAPI NLP engine.
+ * @description API service functions for communicating with the backend and FastAPI NLP engine.
  */
 
 import axios from 'axios';
 
-/** Axios instance for the Flask backend (port 5000) */
-const backendAPI = axios.create({
-  baseURL: '/api',
+/** Axios instance for Node.js / Express backend (port 5000) */
+export const backendAPI = axios.create({
+  baseURL: 'http://localhost:5000/api',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-/** Axios instance for the FastAPI NLP engine (port 8000) */
-const nlpAPI = axios.create({
-  baseURL: '/nlp',
+/** Axios instance for FastAPI NLP engine (port 8000) */
+export const nlpAPI = axios.create({
+  baseURL: 'http://localhost:8000/api',
   timeout: 60000,
   headers: { 'Content-Type': 'application/json' },
 });
 
-/** Request interceptor — attach auth token if available */
+// Interceptor for JWT auth token
 backendAPI.interceptors.request.use((config) => {
   const token = localStorage.getItem('medilingual_token');
   if (token) {
@@ -29,46 +28,53 @@ backendAPI.interceptors.request.use((config) => {
   return config;
 });
 
-/** Response interceptor — normalize errors */
-const errorHandler = (error) => {
-  const message =
-    error.response?.data?.message ||
-    error.response?.data?.error ||
-    error.message ||
-    'An unexpected error occurred';
-  return Promise.reject(new Error(message));
-};
-
-backendAPI.interceptors.response.use((res) => res, errorHandler);
-nlpAPI.interceptors.response.use((res) => res, errorHandler);
-
 /**
  * Sends a healthcare query to the NLP pipeline.
- * @param {Object} params
- * @param {string} params.query - The user's query text.
- * @param {string} params.language - Language code (en, hi, te, auto).
- * @param {boolean} params.codeMixed - Whether code-mixing mode is active.
- * @returns {Promise<Object>} API response with analysis and generated answer.
+ * Accepts either (text, language) or ({ query, language, codeMixed })
  */
-export async function sendQuery({ query, language = 'auto', codeMixed = false }) {
-  const { data } = await nlpAPI.post('/analyze', { query, language, code_mixed: codeMixed });
-  return data;
+export async function sendQuery(param1, param2) {
+  let text = '';
+  let language = 'auto';
+
+  if (typeof param1 === 'object' && param1 !== null) {
+    text = param1.query || param1.text || '';
+    language = param1.language || 'auto';
+  } else {
+    text = param1 || '';
+    language = param2 || 'auto';
+  }
+
+  try {
+    // Send directly to NLP engine endpoint
+    const response = await nlpAPI.post('/chat', {
+      text,
+      language_preference: language,
+    });
+    return response.data;
+  } catch (err) {
+    // Fallback to backend queries endpoint
+    try {
+      const fallback = await backendAPI.post('/queries', {
+        text,
+        languagePreference: language,
+      });
+      return fallback.data?.data || fallback.data;
+    } catch (backendErr) {
+      throw err;
+    }
+  }
 }
 
 /**
  * Retrieves the chat history for the current session.
- * @param {string} sessionId - Session identifier.
- * @returns {Promise<Array>} Array of chat message objects.
  */
 export async function getHistory(sessionId) {
-  const { data } = await backendAPI.get(`/chat/history/${sessionId}`);
+  const { data } = await backendAPI.get(`/chat/sessions/${sessionId}`);
   return data;
 }
 
 /**
  * Detects the language of a given text.
- * @param {string} text - Text to detect language for.
- * @returns {Promise<Object>} Detected language info with confidence.
  */
 export async function detectLanguage(text) {
   const { data } = await nlpAPI.post('/detect-language', { text });
@@ -76,33 +82,39 @@ export async function detectLanguage(text) {
 }
 
 /**
- * Gets autocomplete/suggestion queries based on partial input.
- * @param {string} prefix - Partial query text.
- * @param {string} language - Language code.
- * @returns {Promise<Array<string>>} Suggested query completions.
+ * Gets suggestions/stats.
  */
 export async function getSuggestions(prefix, language = 'en') {
-  const { data } = await backendAPI.get('/suggestions', {
-    params: { prefix, language },
-  });
-  return data;
+  try {
+    const { data } = await backendAPI.get('/queries/stats');
+    return data;
+  } catch (e) {
+    return [];
+  }
 }
 
 /**
  * Submits voice audio for Whisper transcription.
- * @param {Blob} audioBlob - Recorded audio blob.
- * @param {string} language - Expected language code.
- * @returns {Promise<Object>} Transcription result.
  */
 export async function transcribeAudio(audioBlob, language = 'auto') {
   const formData = new FormData();
-  formData.append('audio', audioBlob, 'recording.webm');
+  formData.append('file', audioBlob, 'recording.wav');
   formData.append('language', language);
-  const { data } = await nlpAPI.post('/transcribe', formData, {
+  const { data } = await nlpAPI.post('/voice/transcribe', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 60000,
   });
   return data;
 }
 
-export { backendAPI, nlpAPI };
+const api = {
+  sendQuery,
+  getHistory,
+  detectLanguage,
+  getSuggestions,
+  transcribeAudio,
+  backendAPI,
+  nlpAPI,
+};
+
+export default api;
