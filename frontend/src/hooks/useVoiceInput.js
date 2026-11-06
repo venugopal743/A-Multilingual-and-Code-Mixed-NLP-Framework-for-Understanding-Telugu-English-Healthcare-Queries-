@@ -1,19 +1,13 @@
 /**
  * @file useVoiceInput.js
- * @description Custom hook for Web Speech API voice input with recording state management.
+ * @description Robust Web Speech API voice input hook supporting Telugu, Hindi, English,
+ *              with real-time transcription, error recovery, and transcript controls.
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
-/**
- * Hook providing voice-to-text functionality using the Web Speech API.
- * @param {Object} options
- * @param {string} options.language - BCP-47 language code for recognition.
- * @param {function} options.onResult - Callback fired with the final transcript.
- * @param {function} options.onInterim - Callback fired with interim results.
- * @returns {Object} Voice input state and controls.
- */
-export function useVoiceInput({ language = 'en-US', onResult, onInterim } = {}) {
+export function useVoiceInput({ language = 'auto', onResult, onInterim } = {}) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
@@ -21,12 +15,20 @@ export function useVoiceInput({ language = 'en-US', onResult, onInterim } = {}) 
   const [isSupported, setIsSupported] = useState(false);
   const recognitionRef = useRef(null);
 
-  /** Map internal language codes to BCP-47 */
-  const langMap = {
-    en: 'en-US',
-    hi: 'hi-IN',
-    te: 'te-IN',
-    auto: 'en-US',
+  /** Map internal language codes to BCP-47 for speech recognition */
+  const getBCP47Language = (langCode) => {
+    switch (langCode) {
+      case 'te':
+      case 'te-en':
+        return 'te-IN'; // Telugu (India)
+      case 'hi':
+      case 'hi-en':
+        return 'hi-IN'; // Hindi (India)
+      case 'en':
+      case 'auto':
+      default:
+        return 'en-IN'; // English (India)
+    }
   };
 
   useEffect(() => {
@@ -34,58 +36,89 @@ export function useVoiceInput({ language = 'en-US', onResult, onInterim } = {}) 
     setIsSupported(!!SpeechRecognition);
   }, []);
 
+  /** Reset current transcript */
+  const resetTranscript = useCallback(() => {
+    setTranscript('');
+    setInterimTranscript('');
+  }, []);
+
   /**
    * Starts voice recognition.
+   * @param {string} [langOverride] - Optional language code override
    */
-  const startListening = useCallback(() => {
+  const startListening = useCallback((langOverride) => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setError('Speech recognition is not supported in this browser.');
+      const msg = 'Speech recognition is not supported in this browser. Please use Chrome, Edge, or Brave.';
+      setError(msg);
+      toast.error(msg);
       return;
+    }
+
+    // Stop any existing session
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        // Ignore abort errors
+      }
     }
 
     setError(null);
     setTranscript('');
     setInterimTranscript('');
 
+    const targetLang = langOverride || language;
     const recognition = new SpeechRecognition();
-    recognition.lang = langMap[language] || language;
+    recognition.lang = getBCP47Language(targetLang);
     recognition.interimResults = true;
     recognition.continuous = false;
     recognition.maxAlternatives = 1;
 
     recognition.onstart = () => {
       setIsListening(true);
+      toast.success(`Microphone active (${recognition.lang}). Speak now...`, { id: 'voice-toast' });
     };
 
     recognition.onresult = (event) => {
-      let finalText = '';
-      let interimText = '';
+      let finalStr = '';
+      let interimStr = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          finalText += result[0].transcript;
+          finalStr += result[0].transcript;
         } else {
-          interimText += result[0].transcript;
+          interimStr += result[0].transcript;
         }
       }
 
-      if (interimText) {
-        setInterimTranscript(interimText);
-        onInterim?.(interimText);
+      if (interimStr) {
+        setInterimTranscript(interimStr);
+        onInterim?.(interimStr);
       }
 
-      if (finalText) {
-        setTranscript(finalText);
+      if (finalStr) {
+        setTranscript(finalStr);
         setInterimTranscript('');
-        onResult?.(finalText);
+        onResult?.(finalStr);
       }
     };
 
     recognition.onerror = (event) => {
-      setError(`Voice recognition error: ${event.error}`);
       setIsListening(false);
+      let userMsg = `Voice recognition error: ${event.error}`;
+      if (event.error === 'not-allowed') {
+        userMsg = 'Microphone permission blocked. Please allow microphone access in your browser address bar.';
+      } else if (event.error === 'no-speech') {
+        userMsg = 'No speech detected. Please try speaking closer to your microphone.';
+      } else if (event.error === 'audio-capture') {
+        userMsg = 'No microphone was found. Please ensure a microphone is connected.';
+      } else if (event.error === 'network') {
+        userMsg = 'Speech recognition network error. Please check your internet connection.';
+      }
+      setError(userMsg);
+      toast.error(userMsg, { id: 'voice-toast' });
     };
 
     recognition.onend = () => {
@@ -93,28 +126,34 @@ export function useVoiceInput({ language = 'en-US', onResult, onInterim } = {}) 
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
+
+    try {
+      recognition.start();
+    } catch (err) {
+      console.warn('SpeechRecognition start error:', err);
+      setIsListening(false);
+    }
   }, [language, onResult, onInterim]);
 
-  /**
-   * Stops voice recognition.
-   */
+  /** Stops voice recognition */
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore
+      }
       recognitionRef.current = null;
     }
     setIsListening(false);
   }, []);
 
-  /**
-   * Toggles voice recognition on/off.
-   */
-  const toggleListening = useCallback(() => {
+  /** Toggle listening */
+  const toggleListening = useCallback((langOverride) => {
     if (isListening) {
       stopListening();
     } else {
-      startListening();
+      startListening(langOverride);
     }
   }, [isListening, startListening, stopListening]);
 
@@ -122,7 +161,9 @@ export function useVoiceInput({ language = 'en-US', onResult, onInterim } = {}) 
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {}
       }
     };
   }, []);
@@ -136,6 +177,7 @@ export function useVoiceInput({ language = 'en-US', onResult, onInterim } = {}) 
     startListening,
     stopListening,
     toggleListening,
+    resetTranscript,
   };
 }
 

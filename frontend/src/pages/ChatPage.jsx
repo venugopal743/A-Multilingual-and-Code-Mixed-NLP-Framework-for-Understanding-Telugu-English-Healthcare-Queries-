@@ -9,7 +9,6 @@ import { useAppContext } from '../context/AppContext';
 import { useVoiceInput } from '../hooks/useVoiceInput';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
 import api from '../services/api';
-import { SAMPLE_QUERIES } from '../utils/constants';
 import toast from 'react-hot-toast';
 
 export default function ChatPage() {
@@ -19,7 +18,7 @@ export default function ChatPage() {
       id: 'welcome',
       role: 'assistant',
       content:
-        'Hello! I am MediLingual AI, your multilingual healthcare assistant. You can describe your symptoms or ask medical queries in Telugu (తెలుగు), Hindi (हिन्दी), English, or Code-Mixed text (like "Naaku 2 days nunchi fever undi"). How can I help you today?',
+        'Hello! I am MediLingual AI, your multilingual healthcare assistant. You can describe your symptoms or ask medical queries in Telugu (తెలుగు), Hindi (हिन्दी), English, or Code-Mixed text (like "Naaku 2 days nunchi fever undi"). Click the microphone icon to speak or type below!',
       language: 'en',
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
@@ -28,7 +27,14 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const { isListening, transcript, startListening, stopListening, resetTranscript } = useVoiceInput();
+  const {
+    isListening,
+    transcript,
+    interimTranscript,
+    startListening,
+    stopListening,
+    resetTranscript,
+  } = useVoiceInput({ language: selectedLanguage });
   const { speak } = useSpeechSynthesis();
 
   // Scroll to bottom when messages change
@@ -36,7 +42,7 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  // When voice input transcribes text, auto-fill or handle
+  // When speech recognition produces finalized text, auto-send query
   useEffect(() => {
     if (transcript && !isListening) {
       handleSendMessage(transcript);
@@ -49,7 +55,6 @@ export default function ChatPage() {
       stopListening();
     } else {
       startListening(selectedLanguage);
-      toast.success('Listening... Speak your healthcare query.');
     }
   };
 
@@ -206,6 +211,8 @@ export default function ChatPage() {
               isLoading={isLoading}
               isListening={isListening}
               onToggleVoice={handleToggleVoice}
+              voiceTranscript={transcript}
+              interimTranscript={interimTranscript}
             />
           </div>
         </div>
