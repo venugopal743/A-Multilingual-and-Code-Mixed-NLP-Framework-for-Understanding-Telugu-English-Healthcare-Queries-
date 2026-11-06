@@ -7,128 +7,73 @@ import {
   FaDatabase,
   FaShieldAlt,
   FaCheckCircle,
+  FaCopy,
+  FaCheck,
   FaBrain,
   FaMicrophone,
   FaLanguage,
   FaStethoscope,
-  FaPills,
-  FaSearch,
   FaRobot,
   FaVolumeUp,
   FaArrowDown,
   FaInfoCircle
 } from 'react-icons/fa';
+import toast from 'react-hot-toast';
 
 export default function AboutPage() {
-  const [activeTab, setActiveTab] = useState('diagram'); // 'diagram' or 'table'
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState('diagram'); // 'diagram', 'flowchart', 'table'
   const [selectedNode, setSelectedNode] = useState(null);
 
-  const architectureNodes = [
-    {
-      id: 'patient_input',
-      title: '1. Multimodal Patient Input',
-      model: 'Text & Whisper STT',
-      category: 'Input Layer',
-      color: 'border-sky-500 bg-sky-50/70 text-sky-900',
-      badgeColor: 'bg-sky-100 text-sky-800',
-      icon: FaMicrophone,
-      description: 'Accepts clinical queries via text typing or spoken voice across Telugu, Hindi, English, and Romanized Code-Mixed sentences.',
-      inputData: 'Raw Audio (.wav/.webm) or Typed Text',
-      outputData: 'Standardized String Query + Audio Buffer',
-      latency: '~120ms (Whisper)'
-    },
-    {
-      id: 'language_detection',
-      title: '2. Language Detection & Code-Mixing',
-      model: 'FastText + Unicode Profiler',
-      category: 'Linguistic Layer',
-      color: 'border-teal-500 bg-teal-50/70 text-teal-900',
-      badgeColor: 'bg-teal-100 text-teal-800',
-      icon: FaLanguage,
-      description: 'Identifies dominant language (te, hi, en) and detects code-mixing patterns (te-en, hi-en) with token-level classification.',
-      inputData: 'Raw Query String',
-      outputData: 'Language ID, is_code_mixed flag, token script distribution',
-      latency: '4ms'
-    },
-    {
-      id: 'text_preprocessing',
-      title: '3. Text Normalization & Preprocessing',
-      model: 'Indic NLP Library',
-      category: 'Linguistic Layer',
-      color: 'border-indigo-500 bg-indigo-50/70 text-indigo-900',
-      badgeColor: 'bg-indigo-100 text-indigo-800',
-      icon: FaBrain,
-      description: 'Normalizes Indic diacritics, strips erratic Unicode spacing, expands medical abbreviations, and canonicalizes script tokens.',
-      inputData: 'Tokenized multi-script query',
-      outputData: 'Clean Normalized Indic & Romanized tokens',
-      latency: '6ms'
-    },
-    {
-      id: 'multilingual_nlp',
-      title: '4. Multilingual Contextual Representation',
-      model: 'MuRIL (google/muril-base-cased)',
-      category: 'Representation Layer',
-      color: 'border-blue-500 bg-blue-50/70 text-blue-900',
-      badgeColor: 'bg-blue-100 text-blue-800',
-      icon: FaBrain,
-      description: 'Pre-trained on 17 Indian languages and English to produce rich cross-lingual semantic embeddings that bridge native scripts and code-mixed phonetics.',
-      inputData: 'Normalized Indian & English tokens',
-      outputData: '768-dimensional contextual hidden states',
-      latency: '18ms'
-    },
-    {
-      id: 'extraction_layer',
-      title: '5. Dual Extraction: Medical NER & Intent',
-      model: 'XLM-RoBERTa + Fine-Tuned MuRIL',
-      category: 'Cognitive Extraction Layer',
-      color: 'border-rose-500 bg-rose-50/70 text-rose-900',
-      badgeColor: 'bg-rose-100 text-rose-800',
-      icon: FaStethoscope,
-      description: 'Simultaneously extracts 7 clinical entity classes (symptoms, diseases, medicines, body parts, durations) and classifies 8 healthcare intent classes.',
-      inputData: 'Contextual representation vectors',
-      outputData: 'Entity Spans with confidence + Intent probability vector',
-      latency: '22ms'
-    },
-    {
-      id: 'rag_retrieval',
-      title: '6. Semantic Search & Vector Knowledge (RAG)',
-      model: 'multilingual-e5-base + FAISS',
-      category: 'Knowledge Base Layer',
-      color: 'border-emerald-500 bg-emerald-50/70 text-emerald-900',
-      badgeColor: 'bg-emerald-100 text-emerald-800',
-      icon: FaDatabase,
-      description: 'Dense vector retrieval against 6,548 aligned clinical records (Telugu, Hindi, English). Retrieves top-k relevant clinical snippets.',
-      inputData: 'Dense query embedding from multilingual-e5-base',
-      outputData: 'Top-3 relevant medical records with cosine relevance scores',
-      latency: '14ms'
-    },
-    {
-      id: 'llm_response',
-      title: '7. Grounded LLM Response & Explainability',
-      model: 'Qwen2.5-Instruct / Grounded Templates',
-      category: 'Response Generation Layer',
-      color: 'border-amber-500 bg-amber-50/70 text-amber-900',
-      badgeColor: 'bg-amber-100 text-amber-800',
-      icon: FaRobot,
-      description: 'Generates explainable answers in the user’s preferred language (Telugu/Hindi/English) grounded strictly on retrieved medical guidelines with safety disclaimers.',
-      inputData: 'Entities + Intent + Retrieved Knowledge Snippets',
-      outputData: 'Multilingual Clinical Text + Explainability Breakdown',
-      latency: '45ms'
-    },
-    {
-      id: 'voice_output',
-      title: '8. Speech Synthesis (Optional Voice Output)',
-      model: 'AI4Bharat Indic-TTS',
-      category: 'Audio Output Layer',
-      color: 'border-teal-500 bg-teal-50/70 text-teal-900',
-      badgeColor: 'bg-teal-100 text-teal-800',
-      icon: FaVolumeUp,
-      description: 'Converts generated Telugu, Hindi, or English medical responses into natural spoken voice for enhanced patient accessibility.',
-      inputData: 'Response text string in Telugu/Hindi/English',
-      outputData: 'Natural Indian-language synthesized audio stream',
-      latency: '90ms'
-    }
-  ];
+  const asciiDiagram = `                     PATIENT
+                        │
+                   Text / Voice
+                        ↓
+          ┌─────────────────────────┐
+          │   LANGUAGE DETECTION    │ ──► FastText + Unicode Script Profiler
+          │ Telugu / English / Hindi│
+          │      Code-Mixed         │
+          └────────────┬────────────┘
+                       ↓
+                NLP PREPROCESSING     ──► Indic NLP Library Normalizer
+                       ↓
+          ┌─────────────────────────┐
+          │      MEDICAL NER        │ ──► XLM-RoBERTa (Fine-Tuned)
+          │                         │
+          │  • Symptoms             │ ──► Fine-Tuned MuRIL
+          │  • Diseases             │
+          │  • Medicines            │
+          │  • Doctors / Hospitals  │
+          └────────────┬────────────┘
+                       ↓
+              SYMPTOM EXTRACTION
+                       ↓
+             INTENT CLASSIFICATION    ──► Fine-Tuned MuRIL (8 Healthcare Intents)
+                       ↓
+          ┌─────────────────────────┐
+          │    MEDICAL KNOWLEDGE    │ ──► Semantic Search: multilingual-e5-base
+          │       BASE + RAG        │ ──► Vector Database: FAISS
+          └────────────┬────────────┘
+                       ↓
+                 LLM RESPONSE         ──► Qwen2.5-Instruct / Grounded Templates
+                       ↓
+                EXPLAINABILITY        ──► Entity confidence & cited clinical sources
+                       ↓
+          ┌─────────────────────────┐
+          │     MULTILINGUAL        │
+          │    RESPONSE OUTPUT      │ ──► Grounded Guidance with Medical Disclaimer
+          │                         │
+          │ Telugu / English / Hindi│
+          └────────────┬────────────┘
+                       ↓
+              OPTIONAL VOICE OUTPUT   ──► AI4Bharat Indic-TTS / SpeechSynthesis`;
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(asciiDiagram);
+    setCopied(true);
+    toast.success('Architecture diagram copied to clipboard!');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const models = [
     { module: 'Language Detection', model: 'FastText', purpose: 'Detect Telugu, Hindi and English' },
@@ -142,6 +87,97 @@ export default function AboutPage() {
     { module: 'LLM Response', model: 'Qwen2.5-Instruct', purpose: 'Generate understandable responses' },
     { module: 'Voice Input', model: 'Whisper', purpose: 'Convert speech into text' },
     { module: 'Voice Output', model: 'AI4Bharat Indic-TTS', purpose: 'Generate Indian-language speech' },
+  ];
+
+  const architectureNodes = [
+    {
+      id: 'patient_input',
+      title: '1. Multimodal Patient Input',
+      model: 'Text & Whisper STT',
+      category: 'Input Layer',
+      color: 'border-sky-500 bg-sky-50/70 text-sky-900',
+      badgeColor: 'bg-sky-100 text-sky-800',
+      icon: FaMicrophone,
+      description: 'Accepts clinical queries via text typing or spoken voice across Telugu, Hindi, English, and Romanized Code-Mixed sentences.',
+      latency: '~120ms'
+    },
+    {
+      id: 'language_detection',
+      title: '2. Language Detection & Code-Mixing',
+      model: 'FastText + Unicode Profiler',
+      category: 'Linguistic Layer',
+      color: 'border-teal-500 bg-teal-50/70 text-teal-900',
+      badgeColor: 'bg-teal-100 text-teal-800',
+      icon: FaLanguage,
+      description: 'Identifies dominant language (te, hi, en) and detects code-mixing patterns (te-en, hi-en) with token-level classification.',
+      latency: '4ms'
+    },
+    {
+      id: 'text_preprocessing',
+      title: '3. Text Normalization & Preprocessing',
+      model: 'Indic NLP Library',
+      category: 'Linguistic Layer',
+      color: 'border-indigo-500 bg-indigo-50/70 text-indigo-900',
+      badgeColor: 'bg-indigo-100 text-indigo-800',
+      icon: FaBrain,
+      description: 'Normalizes Indic diacritics, strips erratic Unicode spacing, expands medical abbreviations, and canonicalizes script tokens.',
+      latency: '6ms'
+    },
+    {
+      id: 'multilingual_nlp',
+      title: '4. Multilingual Contextual Representation',
+      model: 'MuRIL (google/muril-base-cased)',
+      category: 'Representation Layer',
+      color: 'border-blue-500 bg-blue-50/70 text-blue-900',
+      badgeColor: 'bg-blue-100 text-blue-800',
+      icon: FaBrain,
+      description: 'Produces cross-lingual embeddings for 17 Indian languages and English to bridge native scripts and code-mixed phonetics.',
+      latency: '18ms'
+    },
+    {
+      id: 'extraction_layer',
+      title: '5. Dual Extraction: Medical NER & Intent',
+      model: 'XLM-RoBERTa + Fine-Tuned MuRIL',
+      category: 'Cognitive Layer',
+      color: 'border-rose-500 bg-rose-50/70 text-rose-900',
+      badgeColor: 'bg-rose-100 text-rose-800',
+      icon: FaStethoscope,
+      description: 'Simultaneously extracts symptoms, diseases, medicines, body parts, durations and classifies 8 healthcare intent classes.',
+      latency: '22ms'
+    },
+    {
+      id: 'rag_retrieval',
+      title: '6. Semantic Search & Vector Knowledge (RAG)',
+      model: 'multilingual-e5-base + FAISS',
+      category: 'Knowledge Base Layer',
+      color: 'border-emerald-500 bg-emerald-50/70 text-emerald-900',
+      badgeColor: 'bg-emerald-100 text-emerald-800',
+      icon: FaDatabase,
+      description: 'Dense vector retrieval against 6,548 aligned clinical records (Telugu, Hindi, English). Retrieves top-k relevant clinical snippets.',
+      latency: '14ms'
+    },
+    {
+      id: 'llm_response',
+      title: '7. Grounded LLM Response & Explainability',
+      model: 'Qwen2.5-Instruct / Grounded Templates',
+      category: 'Response Generation Layer',
+      color: 'border-amber-500 bg-amber-50/70 text-amber-900',
+      badgeColor: 'bg-amber-100 text-amber-800',
+      icon: FaRobot,
+      description: 'Generates explainable answers in the user’s preferred language grounded on medical records with safety disclaimers.',
+      latency: '45ms'
+    },
+    {
+      id: 'voice_output',
+      title: '8. Speech Synthesis (Optional Voice Output)',
+      model: 'AI4Bharat Indic-TTS',
+      category: 'Audio Output Layer',
+      color: 'border-teal-500 bg-teal-50/70 text-teal-900',
+      badgeColor: 'bg-teal-100 text-teal-800',
+      icon: FaVolumeUp,
+      description: 'Converts generated Telugu, Hindi, or English medical responses into natural spoken voice for patient accessibility.',
+      latency: '90ms'
+    }
   ];
 
   return (
@@ -164,60 +200,121 @@ export default function AboutPage() {
         <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl mt-8 border border-slate-200">
           <button
             onClick={() => setActiveTab('diagram')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'diagram'
-                ? 'bg-white text-teal-700 shadow-sm'
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>🏛️ Architecture Pipeline Diagram</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('flowchart')}
+            className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              activeTab === 'flowchart'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <FaProjectDiagram />
-            <span>Interactive Architecture Flowchart</span>
+            <span>Interactive Cards</span>
           </button>
           <button
             onClick={() => setActiveTab('table')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'table'
-                ? 'bg-white text-teal-700 shadow-sm'
+                ? 'bg-slate-900 text-white shadow-sm'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             <FaTable />
-            <span>Model Registry Matrix</span>
+            <span>Model Specifications Matrix</span>
           </button>
         </div>
       </div>
 
-      {/* Tab 1: Interactive Architecture Diagram Flowchart */}
+      {/* Tab 1: The Exact ASCII Architecture Pipeline Diagram */}
       {activeTab === 'diagram' && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-3xl shadow-2xl overflow-hidden border border-slate-800 bg-[#0B1120]"
+        >
+          {/* Window Title Bar */}
+          <div className="bg-[#111827] px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-xl">🏛️</span>
+              <div>
+                <h2 className="text-base font-bold text-white tracking-wide">
+                  End-to-End Pipeline & Model Architecture
+                </h2>
+                <p className="text-[11px] text-slate-400">
+                  Multilingual and Code-Mixed Healthcare NLP Processing Workflow
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleCopy}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono transition-colors border border-slate-700"
+              title="Copy Architecture Diagram to Clipboard"
+            >
+              {copied ? <FaCheck className="text-emerald-400" /> : <FaCopy />}
+              <span>{copied ? 'Copied!' : 'Copy Diagram'}</span>
+            </button>
+          </div>
+
+          {/* Architecture Diagram Code Display */}
+          <div className="p-6 sm:p-8 overflow-x-auto">
+            <pre className="font-mono text-xs sm:text-sm leading-relaxed text-slate-200 select-all whitespace-pre">
+              {asciiDiagram}
+            </pre>
+          </div>
+
+          {/* Quick Annotation Footer */}
+          <div className="bg-[#0f172a] px-6 py-4 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono text-slate-400">
+            <div>
+              <span className="text-teal-400 block font-semibold">Languages:</span>
+              <span>Telugu • Hindi • English</span>
+            </div>
+            <div>
+              <span className="text-sky-400 block font-semibold">Code-Mixed:</span>
+              <span>Romanized & Script mixed</span>
+            </div>
+            <div>
+              <span className="text-amber-400 block font-semibold">Retrieval:</span>
+              <span>multilingual-e5-base + FAISS</span>
+            </div>
+            <div>
+              <span className="text-emerald-400 block font-semibold">Speech:</span>
+              <span>Whisper + Indic-TTS</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Tab 2: Interactive Flowchart Cards */}
+      {activeTab === 'flowchart' && (
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 space-y-8"
+          className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 space-y-6"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-2">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <div>
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <FaProjectDiagram className="text-teal-600" />
-                <span>End-to-End Neural Architecture Flowchart</span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Click any pipeline stage below to inspect its mathematical inputs, underlying transformer, and outputs.
-              </p>
+              <h2 className="text-lg font-bold text-slate-900">Interactive Pipeline Cards</h2>
+              <p className="text-xs text-slate-500 mt-0.5">Click any stage to expand details</p>
             </div>
-            <span className="text-[11px] font-mono text-teal-700 bg-teal-50 px-3 py-1 rounded-full border border-teal-200/80 font-bold self-start sm:self-auto">
-              8 Pipeline Stages • Verified
+            <span className="text-xs font-mono bg-teal-50 text-teal-700 px-3 py-1 rounded-full border border-teal-200 font-bold">
+              8 Stages
             </span>
           </div>
 
-          {/* Visual Architecture Flowchart Blocks */}
           <div className="space-y-4 max-w-4xl mx-auto">
             {architectureNodes.map((node, index) => {
-              const isSelected = selectedNode?.id === node.id;
               const IconComponent = node.icon;
-
               return (
                 <div key={node.id} className="relative">
-                  {/* Connecting Arrow between cards */}
                   {index > 0 && (
                     <div className="flex justify-center -my-1 py-1">
                       <div className="flex flex-col items-center">
@@ -227,82 +324,31 @@ export default function AboutPage() {
                     </div>
                   )}
 
-                  {/* Stage Card */}
-                  <motion.div
-                    whileHover={{ scale: 1.01 }}
-                    onClick={() => setSelectedNode(isSelected ? null : node)}
-                    className={`cursor-pointer rounded-2xl border-2 p-5 transition-all shadow-sm ${
-                      isSelected
-                        ? 'ring-4 ring-teal-500/20 border-teal-600 shadow-md bg-white'
-                        : `${node.color} hover:shadow-md`
-                    }`}
-                  >
+                  <div className={`rounded-2xl border-2 p-5 ${node.color} shadow-sm`}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-3.5">
-                        <div className="w-11 h-11 rounded-xl bg-white shadow-sm flex items-center justify-center flex-shrink-0 text-slate-700">
-                          <IconComponent className="text-xl text-teal-600" />
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-teal-600">
+                          <IconComponent className="text-lg" />
                         </div>
                         <div>
-                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            {node.category}
-                          </span>
-                          <h3 className="text-base font-bold text-slate-900 leading-tight">
-                            {node.title}
-                          </h3>
+                          <span className="text-[10px] font-bold uppercase text-slate-500">{node.category}</span>
+                          <h3 className="text-sm font-bold text-slate-900">{node.title}</h3>
                         </div>
                       </div>
-
-                      <div className="flex items-center gap-2 self-start sm:self-auto">
-                        <span className={`px-3 py-1 rounded-lg text-xs font-mono font-bold ${node.badgeColor}`}>
-                          {node.model}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-400 bg-white/80 px-2 py-0.5 rounded border border-slate-200">
-                          {node.latency}
-                        </span>
-                      </div>
+                      <span className={`px-3 py-1 rounded-lg text-xs font-mono font-bold ${node.badgeColor}`}>
+                        {node.model}
+                      </span>
                     </div>
-
-                    <p className="text-xs text-slate-600 mt-3 leading-relaxed">
-                      {node.description}
-                    </p>
-
-                    {/* Detailed Inspector Drawer on Selection */}
-                    <AnimatePresence>
-                      {isSelected && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="mt-4 pt-4 border-t border-slate-200/80 grid sm:grid-cols-2 gap-3 text-xs"
-                        >
-                          <div className="bg-white/80 p-3 rounded-xl border border-slate-200">
-                            <span className="font-semibold text-slate-500 block mb-1">Incoming Inputs:</span>
-                            <span className="font-mono text-slate-800 text-[11px]">{node.inputData}</span>
-                          </div>
-                          <div className="bg-white/80 p-3 rounded-xl border border-slate-200">
-                            <span className="font-semibold text-slate-500 block mb-1">Generated Output:</span>
-                            <span className="font-mono text-teal-700 font-semibold text-[11px]">{node.outputData}</span>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                    <p className="text-xs text-slate-600 mt-2">{node.description}</p>
+                  </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Quick Tip on Flow */}
-          <div className="p-4 bg-teal-50 border border-teal-200 rounded-2xl flex items-center gap-3 text-xs text-teal-900">
-            <FaInfoCircle className="text-teal-600 text-lg flex-shrink-0" />
-            <span>
-              <strong>Cross-Lingual Execution:</strong> If the patient speaks in Romanized Telugu (e.g. <em>"Naaku 2 days nunchi fever undi"</em>), FastText tags the script, MuRIL produces code-mixed phonetic embeddings, XLM-RoBERTa extracts the symptoms, FAISS pulls clinical guidelines, and the response is synthesized in Telugu.
-            </span>
-          </div>
         </motion.div>
       )}
 
-      {/* Tab 2: Classic Model Registry Table */}
+      {/* Tab 3: Model Specifications Matrix Table */}
       {activeTab === 'table' && (
         <motion.div
           initial={{ opacity: 0, y: 15 }}
