@@ -7,14 +7,14 @@ import axios from 'axios';
 
 /** Axios instance for Node.js / Express backend (port 5000) */
 export const backendAPI = axios.create({
-  baseURL: 'http://localhost:5000/api',
+  baseURL: (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:5000/api',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 });
 
 /** Axios instance for FastAPI NLP engine (port 8000) */
 export const nlpAPI = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: (import.meta.env && import.meta.env.VITE_NLP_URL) || 'http://localhost:8000/api',
   timeout: 60000,
   headers: { 'Content-Type': 'application/json' },
 });
