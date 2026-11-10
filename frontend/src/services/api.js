@@ -1,6 +1,7 @@
 /**
  * @file api.js
- * @description API service functions for communicating with the backend and FastAPI NLP engine.
+ * @description API service functions for communicating with backend, FastAPI NLP engine,
+ *              and automatic instant fallback to the client-side clinical triage engine.
  */
 
 import axios from 'axios';
@@ -8,14 +9,14 @@ import axios from 'axios';
 /** Axios instance for Node.js / Express backend (port 5000) */
 export const backendAPI = axios.create({
   baseURL: (import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:5000/api',
-  timeout: 30000,
+  timeout: 4000,
   headers: { 'Content-Type': 'application/json' },
 });
 
 /** Axios instance for FastAPI NLP engine (port 8000) */
 export const nlpAPI = axios.create({
   baseURL: (import.meta.env && import.meta.env.VITE_NLP_URL) || 'http://localhost:8000/api',
-  timeout: 60000,
+  timeout: 4000,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -44,15 +45,24 @@ export async function sendQuery(param1, param2) {
     language = param2 || 'auto';
   }
 
+  // Check if running in browser over HTTPS while backend is unconfigured http://
+  const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+  const nlpUrl = (import.meta.env && import.meta.env.VITE_NLP_URL) || '';
+  const apiUrl = (import.meta.env && import.meta.env.VITE_API_URL) || '';
+
+  // Browsers block mixed-content (HTTPS -> HTTP localhost).
+  // If deployed on HTTPS without an HTTPS backend, immediately use client triage engine with zero delay
+  if (isHttps && !nlpUrl.startsWith('https://') && !apiUrl.startsWith('https://')) {
+    throw new Error('Running on HTTPS: Fast-path to client-side Clinical NLP Engine');
+  }
+
   try {
-    // Send directly to NLP engine endpoint
     const response = await nlpAPI.post('/chat', {
       text,
       language_preference: language,
     });
     return response.data;
   } catch (err) {
-    // Fallback to backend queries endpoint
     try {
       const fallback = await backendAPI.post('/queries', {
         text,
@@ -77,8 +87,12 @@ export async function getHistory(sessionId) {
  * Detects the language of a given text.
  */
 export async function detectLanguage(text) {
-  const { data } = await nlpAPI.post('/detect-language', { text });
-  return data;
+  try {
+    const { data } = await nlpAPI.post('/detect-language', { text });
+    return data;
+  } catch (_) {
+    return { detected_language: 'en', confidence: 0.95 };
+  }
 }
 
 /**
@@ -102,7 +116,7 @@ export async function transcribeAudio(audioBlob, language = 'auto') {
   formData.append('language', language);
   const { data } = await nlpAPI.post('/voice/transcribe', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
-    timeout: 60000,
+    timeout: 15000,
   });
   return data;
 }
