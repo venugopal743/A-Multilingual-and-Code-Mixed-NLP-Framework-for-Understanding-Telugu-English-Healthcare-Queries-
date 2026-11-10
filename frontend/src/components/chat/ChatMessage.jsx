@@ -99,7 +99,7 @@ export default function ChatMessage({
                         title="Continue Voice Guidance"
                       >
                         <FaPlay className="text-[9px]" />
-                        <span>Continue Guidance</span>
+                        <span>Resume</span>
                       </button>
                     )}
 
