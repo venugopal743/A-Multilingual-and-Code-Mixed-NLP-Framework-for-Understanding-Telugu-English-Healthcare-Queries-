@@ -277,6 +277,11 @@ export default function AnalysisPanel({
   const labelMedicines = effectiveLang === 'te' ? 'మందులు / చికిత్సలు (Pharmacology)' : effectiveLang === 'hi' ? 'दवाएं / देखभाल (Pharmacology)' : 'Pharmacology & Care';
   const labelTimeline = effectiveLang === 'te' ? 'వ్యవధి (Clinical Timeline)' : effectiveLang === 'hi' ? 'अवधि (Clinical Timeline)' : 'Clinical Timeline';
 
+  const localizedSymptoms = (ner.symptoms || []).map((s) => localizeTerm(s, effectiveLang));
+  const localizedDiseases = (ner.diseases || []).map((d) => localizeTerm(d, effectiveLang));
+  const localizedMedicines = (ner.medicines || []).map((m) => localizeTerm(m, effectiveLang));
+  const localizedDurations = (ner.durations || []).map((t) => localizeTerm(t, effectiveLang));
+
   const intentDisplay = intent.intent
     ? intent.intent.replace(/_/g, ' ').toUpperCase()
     : 'CLINICAL TRIAGE ASSESSMENT';
