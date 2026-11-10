@@ -9,7 +9,6 @@ import {
   FaPause,
   FaPlay,
   FaStop,
-  FaMicrophone
 } from 'react-icons/fa';
 
 export default function ChatMessage({
@@ -22,7 +21,7 @@ export default function ChatMessage({
 }) {
   const isUser = message.role === 'user';
   const { isSpeaking = false, isPaused = false, activeId = null } = speechState;
-  const isCurrentAudio = activeId && activeId === message.id;
+  const isCurrentAudio = Boolean(activeId && activeId === message.id);
 
   return (
     <motion.div
@@ -74,15 +73,15 @@ export default function ChatMessage({
         >
           <p className="whitespace-pre-line font-normal tracking-normal">{message.content}</p>
 
-          {/* Interactive Audio Controls: Listen, Pause/Resume, Stop */}
+          {/* Dedicated Voice Output Controls: Listen, Pause/Resume, Stop */}
           {!isUser && onSpeak && (
             <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
-                {/* 1. Play / Listen Button */}
+                {/* 1. Play / Listen Voice Guidance Button */}
                 <button
                   type="button"
                   onClick={() => onSpeak(message.content, message.language || 'en', message.id)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-2xs hover:shadow-xs active:scale-95 ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer ${
                     isCurrentAudio && isSpeaking
                       ? 'bg-teal-600 text-white shadow-sm'
                       : 'bg-teal-50/90 hover:bg-teal-100 dark:bg-teal-900/60 dark:hover:bg-teal-800 text-teal-800 dark:text-teal-200 border border-teal-200/70 dark:border-teal-700'
@@ -93,21 +92,26 @@ export default function ChatMessage({
                   <span>{isCurrentAudio && isSpeaking ? 'Playing Voice...' : 'Listen Voice Guidance'}</span>
                 </button>
 
-                {/* 2. Pause / Resume Button */}
+                {/* 2. Pause / Resume Button — Always Clickable */}
                 <button
                   type="button"
-                  onClick={isCurrentAudio && isPaused ? onResume : onPause}
-                  disabled={!isCurrentAudio}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-semibold transition-all text-xs border ${
-                    isCurrentAudio && isPaused
-                      ? 'bg-teal-600 hover:bg-teal-700 text-white border-teal-600 shadow-xs cursor-pointer'
-                      : isCurrentAudio && isSpeaking
-                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 shadow-2xs cursor-pointer'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed'
+                  onClick={() => {
+                    if (isPaused) {
+                      onResume();
+                    } else {
+                      onPause();
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 ${
+                    isPaused
+                      ? 'bg-teal-600 hover:bg-teal-700 text-white border-teal-600 shadow-xs'
+                      : isSpeaking
+                      ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 shadow-2xs'
+                      : 'bg-amber-50/80 hover:bg-amber-100 text-amber-800 border-amber-200/90'
                   }`}
-                  title={isCurrentAudio && isPaused ? 'Resume Voice Guidance' : 'Pause Voice Guidance'}
+                  title={isPaused ? 'Resume Voice Guidance' : 'Pause Voice Guidance'}
                 >
-                  {isCurrentAudio && isPaused ? (
+                  {isPaused ? (
                     <>
                       <FaPlay className="text-[9px]" />
                       <span>Resume</span>
@@ -120,16 +124,11 @@ export default function ChatMessage({
                   )}
                 </button>
 
-                {/* 3. Stop Button */}
+                {/* 3. Stop Button — Always Clickable */}
                 <button
                   type="button"
-                  onClick={onStop}
-                  disabled={!isCurrentAudio}
-                  className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-semibold transition-all text-xs border ${
-                    isCurrentAudio && (isSpeaking || isPaused)
-                      ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300 shadow-2xs cursor-pointer'
-                      : 'bg-slate-50 text-slate-400 border-slate-200 opacity-60 cursor-not-allowed'
-                  }`}
+                  onClick={() => onStop()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200/90 shadow-2xs hover:shadow-xs"
                   title="Stop Voice Playback"
                 >
                   <FaStop className="text-[9px] text-rose-600" />

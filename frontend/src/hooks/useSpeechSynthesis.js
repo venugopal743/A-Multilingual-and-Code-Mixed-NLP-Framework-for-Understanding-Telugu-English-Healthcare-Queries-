@@ -1,12 +1,18 @@
 /**
  * @file useSpeechSynthesis.js
- * @description Robust, cross-platform Text-To-Speech hook for Multilingual Healthcare NLP (Telugu, Hindi, English).
- * Provides seamless playback for Telugu and Hindi (which lack native Windows SAPI voices)
- * via Google Cloud TTS stream with instant fallback to Web Speech Synthesis.
- * Guarantees immediate UI update (showing Pause & Stop buttons) and full playback control.
+ * @description Bulletproof Text-To-Speech hook for Multilingual Healthcare NLP (Telugu, Hindi, English).
+ * Uses a robust audio stream controller with instant Pause, Resume, and Stop controls,
+ * backed by Web Speech Synthesis fallback.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+
+/** Global audio instance for guaranteed single-point playback control */
+let globalAudio = null;
+let chunkQueue = [];
+let currentChunkIndex = 0;
+let currentLanguage = 'en';
+let playbackMode = null; // 'audio' or 'speech'
 
 /**
  * Determines target language code ('te', 'hi', 'en') and BCP-47 tag.
@@ -26,12 +32,10 @@ function resolveLanguage(text, langCode) {
 }
 
 /**
- * Splits clinical text into speakable sentence chunks (< 180 chars each)
- * for smooth continuous audio streaming.
+ * Splits clinical text into speakable sentence chunks (< 170 chars each).
  */
 function splitIntoChunks(text, maxLen = 170) {
   if (!text) return [];
-  // Split on sentence boundaries
   const sentences = text.match(/[^.!?\n;]+[.!?\n;]+|[^.!?\n;]+$/g) || [text];
   const chunks = [];
 
@@ -42,7 +46,6 @@ function splitIntoChunks(text, maxLen = 170) {
     if (trimmed.length <= maxLen) {
       chunks.push(trimmed);
     } else {
-      // Split by words
       const words = trimmed.split(/\s+/);
       let current = '';
       for (const word of words) {
@@ -67,14 +70,7 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [voices, setVoices] = useState([]);
   const [isSupported, setIsSupported] = useState(true);
 
-  // References for playback management
-  const currentAudioRef = useRef(null);
-  const chunkQueueRef = useRef([]);
-  const currentChunkIndexRef = useRef(0);
-  const currentLangRef = useRef('en');
-  const activeModeRef = useRef(null); // 'audio' or 'speech'
-
-  // Load browser speech synthesis voices if available
+  // Initialize voices
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const supported = 'speechSynthesis' in window;
@@ -94,27 +90,29 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     }
   }, []);
 
-  /** Stop all playback and reset state */
+  /** Stop all audio and reset state */
   const cancel = useCallback(() => {
-    // 1. Stop HTML5 audio
-    if (currentAudioRef.current) {
+    // 1. Halt HTML5 Audio
+    if (globalAudio) {
       try {
-        currentAudioRef.current.pause();
-        currentAudioRef.current.src = '';
-        currentAudioRef.current = null;
+        globalAudio.pause();
+        globalAudio.onended = null;
+        globalAudio.onerror = null;
+        globalAudio.src = '';
+        globalAudio = null;
       } catch (_) {}
     }
-    chunkQueueRef.current = [];
-    currentChunkIndexRef.current = 0;
+    chunkQueue = [];
+    currentChunkIndex = 0;
 
-    // 2. Stop Web Speech Synthesis
+    // 2. Halt Web Speech Synthesis
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
       } catch (_) {}
     }
 
-    activeModeRef.current = null;
+    playbackMode = null;
     setIsSpeaking(false);
     setIsPaused(false);
     setActiveId(null);
@@ -123,84 +121,84 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
 
   /** Pause active playback */
   const pause = useCallback(() => {
-    if (activeModeRef.current === 'audio' && currentAudioRef.current) {
+    // Pause HTML5 Audio
+    if (globalAudio) {
       try {
-        currentAudioRef.current.pause();
+        globalAudio.pause();
       } catch (_) {}
-    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    }
+    // Pause Web Speech
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.pause();
       } catch (_) {}
     }
     setIsPaused(true);
+    setIsSpeaking(false);
   }, []);
 
   /** Resume paused playback */
   const resume = useCallback(() => {
-    if (activeModeRef.current === 'audio' && currentAudioRef.current) {
+    // Resume HTML5 Audio
+    if (globalAudio) {
       try {
-        currentAudioRef.current.play();
+        globalAudio.play();
       } catch (_) {}
-    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    }
+    // Resume Web Speech
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.resume();
       } catch (_) {}
     }
     setIsPaused(false);
+    setIsSpeaking(true);
   }, []);
 
-  /**
-   * Play next chunk in queue using HTML5 Audio
-   */
-  const playNextChunk = useCallback(() => {
-    const queue = chunkQueueRef.current;
-    const index = currentChunkIndexRef.current;
-
-    if (index >= queue.length) {
-      // Finished all chunks
+  /** Play next sentence chunk in queue */
+  const playNext = useCallback(() => {
+    if (currentChunkIndex >= chunkQueue.length) {
       cancel();
       return;
     }
 
-    const chunk = queue[index];
-    const lang = currentLangRef.current;
-    const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+    const chunk = chunkQueue[currentChunkIndex];
+    const lang = currentLanguage;
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
       chunk
     )}&tl=${lang}&client=tw-ob`;
 
     const audio = new Audio();
     audio.referrerPolicy = 'no-referrer';
     audio.crossOrigin = 'anonymous';
-    audio.src = audioUrl;
-    currentAudioRef.current = audio;
+    audio.src = url;
+    globalAudio = audio;
+    playbackMode = 'audio';
 
     audio.onended = () => {
-      currentChunkIndexRef.current += 1;
-      playNextChunk();
+      currentChunkIndex += 1;
+      playNext();
     };
 
     audio.onerror = () => {
-      // If audio fails for this chunk, attempt browser synthesis fallback
-      fallbackToWebSpeech(chunk, lang);
+      // Fallback to browser Web Speech API
+      fallbackSpeech(chunk, lang);
     };
 
     audio.play().catch(() => {
-      // Autoplay or network issue, fallback to Web Speech
-      fallbackToWebSpeech(chunk, lang);
+      fallbackSpeech(chunk, lang);
     });
   }, [cancel]);
 
-  /**
-   * Fallback to Web Speech Synthesis API
-   */
-  const fallbackToWebSpeech = useCallback(
+  /** Fallback to browser SpeechSynthesis */
+  const fallbackSpeech = useCallback(
     (text, langKey) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
         cancel();
         return;
       }
 
-      activeModeRef.current = 'speech';
+      playbackMode = 'speech';
       const bcp = langKey === 'te' ? 'te-IN' : langKey === 'hi' ? 'hi-IN' : 'en-US';
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = bcp;
@@ -231,55 +229,38 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     [cancel, pitch, rate, voices]
   );
 
-  /**
-   * Speaks the clinical text.
-   * Immediately updates UI state so Pause & Stop buttons show up synchronously on click.
-   */
+  /** Main speak function */
   const speak = useCallback(
     (text, lang, id) => {
       if (!text) return;
 
-      // Stop any existing playback first
-      if (currentAudioRef.current) {
-        try {
-          currentAudioRef.current.pause();
-          currentAudioRef.current = null;
-        } catch (_) {}
-      }
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch (_) {}
-      }
+      // Stop previous playback
+      cancel();
 
-      // Synchronously set UI state so Pause & Stop show immediately
+      // Set active playback state
       if (id) {
         setActiveId(id);
       }
       setIsSpeaking(true);
       setIsPaused(false);
 
-      // Clean markdown characters from clinical guidance text
       const cleanText = text
         .replace(/[*_#`~[\]()]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
       const { key } = resolveLanguage(cleanText, lang);
-      currentLangRef.current = key;
+      currentLanguage = key;
 
-      const chunks = splitIntoChunks(cleanText);
-      chunkQueueRef.current = chunks;
-      currentChunkIndexRef.current = 0;
-      activeModeRef.current = 'audio';
+      chunkQueue = splitIntoChunks(cleanText);
+      currentChunkIndex = 0;
 
-      // Start playing
-      playNextChunk();
+      playNext();
     },
-    [playNextChunk]
+    [cancel, playNext]
   );
 
-  // Clean up on component unmount
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       cancel();
