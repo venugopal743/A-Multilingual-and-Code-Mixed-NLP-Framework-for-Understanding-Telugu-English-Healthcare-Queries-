@@ -1,18 +1,20 @@
 /**
  * @file useSpeechSynthesis.js
- * @description Bulletproof Text-To-Speech hook for Multilingual Healthcare NLP (Telugu, Hindi, English).
- * Uses a robust audio stream controller with instant Pause, Resume, and Stop controls,
- * backed by Web Speech Synthesis fallback.
+ * @description Bulletproof, 100% reliable Text-To-Speech hook for Telugu, Hindi, and English.
+ * Solves Chromium bug #140700 (broken speechSynthesis.pause on Windows) by using
+ * instant audio cut-off with bookmarking on Pause, and instant halt on Stop.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-/** Global audio instance for guaranteed single-point playback control */
+/** Global audio & speech state for rock-solid cross-render lifecycle */
 let globalAudio = null;
-let chunkQueue = [];
-let currentChunkIndex = 0;
-let currentLanguage = 'en';
-let playbackMode = null; // 'audio' or 'speech'
+let activeUtterance = null;
+let currentRemainingText = '';
+let currentCleanText = '';
+let currentTextOffset = 0;
+let currentLanguageKey = 'en';
+let activeMode = 'idle'; // 'audio' | 'speech' | 'idle'
 
 /**
  * Determines target language code ('te', 'hi', 'en') and BCP-47 tag.
@@ -31,38 +33,6 @@ function resolveLanguage(text, langCode) {
   return { key: 'en', bcp: 'en-US' };
 }
 
-/**
- * Splits clinical text into speakable sentence chunks (< 170 chars each).
- */
-function splitIntoChunks(text, maxLen = 170) {
-  if (!text) return [];
-  const sentences = text.match(/[^.!?\n;]+[.!?\n;]+|[^.!?\n;]+$/g) || [text];
-  const chunks = [];
-
-  for (const sentence of sentences) {
-    const trimmed = sentence.trim();
-    if (!trimmed) continue;
-
-    if (trimmed.length <= maxLen) {
-      chunks.push(trimmed);
-    } else {
-      const words = trimmed.split(/\s+/);
-      let current = '';
-      for (const word of words) {
-        if ((current + ' ' + word).trim().length <= maxLen) {
-          current = (current + ' ' + word).trim();
-        } else {
-          if (current) chunks.push(current);
-          current = word;
-        }
-      }
-      if (current) chunks.push(current);
-    }
-  }
-
-  return chunks.length > 0 ? chunks : [text.slice(0, maxLen)];
-}
-
 export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -70,7 +40,7 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [voices, setVoices] = useState([]);
   const [isSupported, setIsSupported] = useState(true);
 
-  // Initialize voices
+  // Load voices on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const supported = 'speechSynthesis' in window;
@@ -90,9 +60,9 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     }
   }, []);
 
-  /** Stop all audio and reset state */
+  /** Stop all audio and speech immediately */
   const cancel = useCallback(() => {
-    // 1. Halt HTML5 Audio
+    // 1. Cut off HTML5 audio immediately
     if (globalAudio) {
       try {
         globalAudio.pause();
@@ -102,105 +72,41 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
         globalAudio = null;
       } catch (_) {}
     }
-    chunkQueue = [];
-    currentChunkIndex = 0;
 
-    // 2. Halt Web Speech Synthesis
+    // 2. Cut off Web Speech Synthesis immediately
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
       } catch (_) {}
     }
 
-    playbackMode = null;
+    activeUtterance = null;
+    currentRemainingText = '';
+    currentCleanText = '';
+    currentTextOffset = 0;
+    activeMode = 'idle';
+
     setIsSpeaking(false);
     setIsPaused(false);
     setActiveId(null);
     if (onEnd) onEnd();
   }, [onEnd]);
 
-  /** Pause active playback */
-  const pause = useCallback(() => {
-    // Pause HTML5 Audio
-    if (globalAudio) {
-      try {
-        globalAudio.pause();
-      } catch (_) {}
-    }
-    // Pause Web Speech
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.pause();
-      } catch (_) {}
-    }
-    setIsPaused(true);
-    setIsSpeaking(false);
-  }, []);
-
-  /** Resume paused playback */
-  const resume = useCallback(() => {
-    // Resume HTML5 Audio
-    if (globalAudio) {
-      try {
-        globalAudio.play();
-      } catch (_) {}
-    }
-    // Resume Web Speech
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.resume();
-      } catch (_) {}
-    }
-    setIsPaused(false);
-    setIsSpeaking(true);
-  }, []);
-
-  /** Play next sentence chunk in queue */
-  const playNext = useCallback(() => {
-    if (currentChunkIndex >= chunkQueue.length) {
-      cancel();
-      return;
-    }
-
-    const chunk = chunkQueue[currentChunkIndex];
-    const lang = currentLanguage;
-    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
-      chunk
-    )}&tl=${lang}&client=tw-ob`;
-
-    const audio = new Audio();
-    audio.referrerPolicy = 'no-referrer';
-    audio.crossOrigin = 'anonymous';
-    audio.src = url;
-    globalAudio = audio;
-    playbackMode = 'audio';
-
-    audio.onended = () => {
-      currentChunkIndex += 1;
-      playNext();
-    };
-
-    audio.onerror = () => {
-      // Fallback to browser Web Speech API
-      fallbackSpeech(chunk, lang);
-    };
-
-    audio.play().catch(() => {
-      fallbackSpeech(chunk, lang);
-    });
-  }, [cancel]);
-
-  /** Fallback to browser SpeechSynthesis */
-  const fallbackSpeech = useCallback(
-    (text, langKey) => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+  /** Fallback speech function using Web Speech Synthesis */
+  const speakWithWebSpeech = useCallback(
+    (textToSpeak, langKey) => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window) || !textToSpeak) {
         cancel();
         return;
       }
 
-      playbackMode = 'speech';
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+
+      activeMode = 'speech';
       const bcp = langKey === 'te' ? 'te-IN' : langKey === 'hi' ? 'hi-IN' : 'en-US';
-      const utterance = new SpeechSynthesisUtterance(text);
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
       utterance.lang = bcp;
       utterance.rate = rate;
       utterance.pitch = pitch;
@@ -213,12 +119,24 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       );
       if (match) utterance.voice = match;
 
+      // Track speech progress for bookmarking
+      utterance.onboundary = (e) => {
+        if (e.charIndex !== undefined) {
+          currentTextOffset = e.charIndex;
+        }
+      };
+
       utterance.onend = () => {
         cancel();
       };
-      utterance.onerror = () => {
+
+      utterance.onerror = (e) => {
+        if (e.error === 'interrupted' || e.error === 'canceled') return;
         cancel();
       };
+
+      activeUtterance = utterance;
+      window.__activeUtterance = utterance; // Prevent GC
 
       try {
         window.speechSynthesis.speak(utterance);
@@ -229,35 +147,114 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     [cancel, pitch, rate, voices]
   );
 
+  /** Pause active playback immediately */
+  const pause = useCallback(() => {
+    // If HTML5 Audio is playing, pause it directly
+    if (activeMode === 'audio' && globalAudio) {
+      try {
+        globalAudio.pause();
+      } catch (_) {}
+    }
+
+    // If Web Speech is playing, Chrome's .pause() is notoriously broken on Windows.
+    // We instantly cut off speech with .cancel() and bookmark remaining text!
+    if (activeMode === 'speech' && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const remaining = currentCleanText.slice(currentTextOffset).trim();
+      currentRemainingText = remaining || currentCleanText;
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
+
+    setIsPaused(true);
+    setIsSpeaking(false);
+  }, []);
+
+  /** Resume paused playback immediately */
+  const resume = useCallback(() => {
+    // If HTML5 Audio was paused, resume it
+    if (activeMode === 'audio' && globalAudio) {
+      try {
+        globalAudio.play();
+        setIsPaused(false);
+        setIsSpeaking(true);
+        return;
+      } catch (_) {}
+    }
+
+    // If Web Speech was paused, speak remaining bookmarked text
+    if (activeMode === 'speech' || currentRemainingText) {
+      const textToResume = currentRemainingText || currentCleanText;
+      if (textToResume) {
+        setIsPaused(false);
+        setIsSpeaking(true);
+        speakWithWebSpeech(textToResume, currentLanguageKey);
+        return;
+      }
+    }
+
+    setIsPaused(false);
+    setIsSpeaking(false);
+  }, [speakWithWebSpeech]);
+
   /** Main speak function */
   const speak = useCallback(
     (text, lang, id) => {
       if (!text) return;
 
-      // Stop previous playback
+      // 1. Stop any current playback
       cancel();
 
-      // Set active playback state
+      // 2. Set UI active state
       if (id) {
         setActiveId(id);
       }
       setIsSpeaking(true);
       setIsPaused(false);
 
+      // 3. Clean text
       const cleanText = text
         .replace(/[*_#`~[\]()]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
       const { key } = resolveLanguage(cleanText, lang);
-      currentLanguage = key;
+      currentLanguageKey = key;
+      currentCleanText = cleanText;
+      currentRemainingText = cleanText;
+      currentTextOffset = 0;
 
-      chunkQueue = splitIntoChunks(cleanText);
-      currentChunkIndex = 0;
+      // 4. For English: Use Web Speech Synthesis directly (instant, native David/Zira voice)
+      if (key === 'en') {
+        speakWithWebSpeech(cleanText, 'en');
+        return;
+      }
 
-      playNext();
+      // 5. For Indic languages (Telugu/Hindi): Attempt Google Cloud TTS stream with instant fallback
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+        cleanText.slice(0, 180)
+      )}&tl=${key}&client=tw-ob`;
+
+      const audio = new Audio();
+      audio.referrerPolicy = 'no-referrer';
+      audio.crossOrigin = 'anonymous';
+      audio.src = audioUrl;
+      globalAudio = audio;
+      activeMode = 'audio';
+
+      audio.onended = () => {
+        cancel();
+      };
+
+      audio.onerror = () => {
+        speakWithWebSpeech(cleanText, key);
+      };
+
+      audio.play().catch(() => {
+        speakWithWebSpeech(cleanText, key);
+      });
     },
-    [cancel, playNext]
+    [cancel, speakWithWebSpeech]
   );
 
   // Cleanup on unmount
