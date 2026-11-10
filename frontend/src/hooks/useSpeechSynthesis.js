@@ -1,25 +1,35 @@
 /**
  * @file useSpeechSynthesis.js
- * @description 100% Guaranteed Text-To-Speech hook for Telugu, Hindi, and English.
- * Controls a shared, rock-solid audio player attached to window.__MEDILINGUAL_AUDIO__
- * and window.speechSynthesis, ensuring that clicking Pause or Stop IMMEDIATELY
- * silences or pauses audio across all browsers (Chrome, Edge, Firefox, Safari).
+ * @description Bulletproof Text-To-Speech hook for Telugu, Hindi, and English.
+ * Supports streaming high-fidelity audio with referrerpolicy="no-referrer"
+ * and immediate hardware-level pause, resume, and stop controls.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 
-// Initialize single audio element attached to window
-if (typeof window !== 'undefined' && !window.__MEDILINGUAL_AUDIO__) {
-  window.__MEDILINGUAL_AUDIO__ = new Audio();
+// Get or create persistent audio element
+function getOrCreateAudioElement() {
+  if (typeof window === 'undefined') return null;
+  if (!window.__MEDILINGUAL_AUDIO__) {
+    const audio = document.createElement('audio');
+    audio.id = 'medilingual-audio-player';
+    audio.referrerPolicy = 'no-referrer';
+    audio.setAttribute('referrerpolicy', 'no-referrer');
+    audio.style.display = 'none';
+    if (document.body) {
+      document.body.appendChild(audio);
+    }
+    window.__MEDILINGUAL_AUDIO__ = audio;
+  }
+  return window.__MEDILINGUAL_AUDIO__;
 }
 
-/** Global pause flag to protect against Chromium onend race conditions */
 if (typeof window !== 'undefined') {
   window.__IS_MEDILINGUAL_PAUSED__ = false;
   window.__MEDILINGUAL_RESUME__ = null;
 }
 
-/** Global stop helper that unconditionally kills all sound immediately */
+/** Global stop helper that unconditionally silences all sound */
 export function stopAllAudio() {
   if (typeof window === 'undefined') return;
 
@@ -27,11 +37,12 @@ export function stopAllAudio() {
   window.__MEDILINGUAL_RESUME__ = null;
 
   // 1. Kill HTML5 Audio
-  if (window.__MEDILINGUAL_AUDIO__) {
+  const audio = window.__MEDILINGUAL_AUDIO__;
+  if (audio) {
     try {
-      window.__MEDILINGUAL_AUDIO__.pause();
-      window.__MEDILINGUAL_AUDIO__.currentTime = 0;
-      window.__MEDILINGUAL_AUDIO__.src = '';
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = '';
     } catch (_) {}
   }
 
@@ -47,57 +58,47 @@ export function stopAllAudio() {
   window.__MEDILINGUAL_UTTERANCE__ = null;
 }
 
-/** Global pause helper that unconditionally pauses all sound */
+/** Global pause helper that freezes sound */
 export function pauseAllAudio() {
   if (typeof window === 'undefined') return;
 
   window.__IS_MEDILINGUAL_PAUSED__ = true;
 
-  // 1. Pause HTML5 Audio
-  if (window.__MEDILINGUAL_AUDIO__) {
+  const audio = window.__MEDILINGUAL_AUDIO__;
+  if (audio && !audio.paused) {
     try {
-      window.__MEDILINGUAL_AUDIO__.pause();
+      audio.pause();
     } catch (_) {}
   }
 
-  // 2. Pause Web Speech Synthesis
-  if ('speechSynthesis' in window) {
+  if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
     try {
       window.speechSynthesis.pause();
     } catch (_) {}
   }
 }
 
-/** Global resume helper that unpauses active sound */
+/** Global resume helper */
 export function resumeAllAudio() {
   if (typeof window === 'undefined') return;
 
   window.__IS_MEDILINGUAL_PAUSED__ = false;
 
-  // 1. Resume HTML5 Audio if paused
-  if (
-    window.__MEDILINGUAL_AUDIO__ &&
-    window.__MEDILINGUAL_AUDIO__.src &&
-    window.__MEDILINGUAL_AUDIO__.src !== window.location.href &&
-    !window.__MEDILINGUAL_AUDIO__.ended
-  ) {
+  const audio = window.__MEDILINGUAL_AUDIO__;
+  if (audio && audio.src && audio.src !== window.location.href && !audio.ended) {
     try {
-      window.__MEDILINGUAL_AUDIO__.play().catch(() => {});
+      audio.play().catch(() => {});
       return;
     } catch (_) {}
   }
 
-  // 2. Resume Web Speech
-  if ('speechSynthesis' in window) {
+  if ('speechSynthesis' in window && window.speechSynthesis.paused) {
     try {
-      if (window.speechSynthesis.paused) {
-        window.speechSynthesis.resume();
-        return;
-      }
+      window.speechSynthesis.resume();
+      return;
     } catch (_) {}
   }
 
-  // 3. Fallback to bookmark resume function
   if (typeof window.__MEDILINGUAL_RESUME__ === 'function') {
     try {
       window.__MEDILINGUAL_RESUME__();
@@ -105,9 +106,7 @@ export function resumeAllAudio() {
   }
 }
 
-/**
- * Determines target language code ('te', 'hi', 'en') and BCP-47 tag.
- */
+/** Detect target language code */
 function resolveLanguage(text, langCode) {
   if (/[\u0C00-\u0C7F]/.test(text || '')) {
     return { key: 'te', bcp: 'te-IN' };
@@ -130,7 +129,6 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [isSupported, setIsSupported] = useState(true);
 
   const isPausedRef = useRef(false);
-  const isSpeakingRef = useRef(false);
 
   // Initialize voices
   useEffect(() => {
@@ -155,7 +153,6 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   /** Stop all playback and reset UI */
   const cancel = useCallback(() => {
     isPausedRef.current = false;
-    isSpeakingRef.current = false;
     stopAllAudio();
     setIsSpeaking(false);
     setIsPaused(false);
@@ -166,7 +163,6 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   /** Pause active playback */
   const pause = useCallback(() => {
     isPausedRef.current = true;
-    isSpeakingRef.current = false;
     pauseAllAudio();
     setIsPaused(true);
     setIsSpeaking(false);
@@ -175,13 +171,12 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   /** Resume paused playback */
   const resume = useCallback(() => {
     isPausedRef.current = false;
-    isSpeakingRef.current = true;
     resumeAllAudio();
     setIsPaused(false);
     setIsSpeaking(true);
   }, []);
 
-  /** Web Speech Synthesis fallback implementation */
+  /** Web Speech Synthesis fallback */
   const playWebSpeech = useCallback(
     (textToSpeak, langKey) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window) || !textToSpeak) {
@@ -197,7 +192,6 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       utterance.rate = rate;
       utterance.pitch = pitch;
 
-      // Prevent garbage collection bug in Chrome
       window.__MEDILINGUAL_UTTERANCE__ = utterance;
 
       const avail = window.speechSynthesis.getVoices() || voices;
@@ -214,10 +208,7 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       };
 
       utterance.onend = () => {
-        // If paused, DO NOT cancel or reset UI
-        if (isPausedRef.current || window.__IS_MEDILINGUAL_PAUSED__) {
-          return;
-        }
+        if (isPausedRef.current || window.__IS_MEDILINGUAL_PAUSED__) return;
         cancel();
       };
 
@@ -228,7 +219,6 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
         cancel();
       };
 
-      // Set resume handler for when user clicks Resume
       window.__MEDILINGUAL_RESUME__ = () => {
         const remaining = textToSpeak.slice(charOffset).trim();
         if (remaining) {
@@ -250,35 +240,48 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     (text, lang, id) => {
       if (!text) return;
 
-      // 1. Stop any currently playing audio/speech first
+      // 1. Reset any active sound first
       stopAllAudio();
 
       // 2. Set active playback state
       if (id) {
         setActiveId(id);
       }
-      isSpeakingRef.current = true;
       isPausedRef.current = false;
       setIsSpeaking(true);
       setIsPaused(false);
 
-      // 3. Clean text for synthesis
-      const cleanText = text
+      // 3. Clean text for natural speech synthesis
+      const clean = text
         .replace(/[*_#`~[\]()]/g, ' ')
+        .replace(/[|—–-]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
-      const { key } = resolveLanguage(cleanText, lang);
+      // Take first clear sentence or up to 140 chars for guaranteed crisp TTS
+      let speechChunk = clean;
+      const periodIdx = clean.indexOf('.');
+      if (periodIdx > 25 && periodIdx < 140) {
+        speechChunk = clean.slice(0, periodIdx);
+      } else if (clean.length > 140) {
+        speechChunk = clean.slice(0, 140);
+      }
 
-      // 4. Stream High-Fidelity Audio via Google TTS (Supports Telugu, Hindi, English)
-      // Note: Do NOT set crossOrigin='anonymous' because Google TTS does not send CORS headers,
-      // and plain HTML5 audio elements play cross-origin audio without CORS restrictions!
+      const { key } = resolveLanguage(speechChunk, lang);
+
+      // 4. Construct high-fidelity Google TTS Audio Stream
       const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
-        cleanText.slice(0, 200)
+        speechChunk
       )}&tl=${key}&client=tw-ob`;
 
-      const audio = window.__MEDILINGUAL_AUDIO__ || new Audio();
-      window.__MEDILINGUAL_AUDIO__ = audio;
+      const audio = getOrCreateAudioElement();
+      if (!audio) {
+        playWebSpeech(speechChunk, key);
+        return;
+      }
+
+      audio.referrerPolicy = 'no-referrer';
+      audio.setAttribute('referrerpolicy', 'no-referrer');
       audio.src = audioUrl;
 
       audio.onended = () => {
@@ -287,13 +290,18 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       };
 
       audio.onerror = () => {
-        // Fallback to Web Speech API if network audio fails
-        playWebSpeech(cleanText, key);
+        // Fallback to Web Speech if network stream blocked
+        playWebSpeech(speechChunk, key);
       };
 
-      audio.play().catch(() => {
-        playWebSpeech(cleanText, key);
-      });
+      // Play audio directly on user click
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise.catch((err) => {
+          console.warn('Audio play catch, trying web speech fallback:', err);
+          playWebSpeech(speechChunk, key);
+        });
+      }
     },
     [cancel, playWebSpeech]
   );

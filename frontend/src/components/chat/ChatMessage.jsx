@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaUser,
   FaUserMd,
@@ -21,14 +21,17 @@ export default function ChatMessage({
 }) {
   const isUser = message.role === 'user';
   const { isSpeaking = false, isPaused = false, activeId = null } = speechState;
-  const isCurrentAudio = Boolean(activeId && activeId === message.id);
+
+  // Audio is active specifically for THIS message bubble
+  const isCurrentMessageAudio = Boolean(activeId && activeId === message.id);
+  const isAudioActive = isCurrentMessageAudio && (isSpeaking || isPaused);
 
   /** Direct hardware stop for instantaneous silence */
   const handleDirectStop = (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    // 1. Immediately kill HTML5 Audio
+    // 1. Instantly kill HTML5 Audio
     if (typeof window !== 'undefined' && window.__MEDILINGUAL_AUDIO__) {
       try {
         window.__MEDILINGUAL_AUDIO__.pause();
@@ -37,7 +40,7 @@ export default function ChatMessage({
       } catch (_) {}
     }
 
-    // 2. Immediately cancel Web Speech
+    // 2. Instantly cancel Web Speech
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
@@ -51,7 +54,7 @@ export default function ChatMessage({
       window.__MEDILINGUAL_RESUME__ = null;
     }
 
-    // 3. Update React state
+    // 3. Reset React audio state to immediately hide pause/stop buttons
     if (onStop) onStop();
   };
 
@@ -150,75 +153,94 @@ export default function ChatMessage({
         >
           <p className="whitespace-pre-line font-normal tracking-normal">{message.content}</p>
 
-          {/* Dedicated Voice Output Controls: Listen, Pause/Resume, Stop */}
+          {/* Voice Output Controls Section */}
           {!isUser && onSpeak && (
             <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-2 flex-wrap">
-                {/* 1. Play / Listen Voice Guidance Button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onSpeak(message.content, message.language || 'en', message.id);
-                  }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer ${
-                    isCurrentAudio && isSpeaking
-                      ? 'bg-teal-600 text-white shadow-sm'
-                      : 'bg-teal-50/90 hover:bg-teal-100 dark:bg-teal-900/60 dark:hover:bg-teal-800 text-teal-800 dark:text-teal-200 border border-teal-200/70 dark:border-teal-700'
-                  }`}
-                  title="Listen to Clinical Voice Guidance"
-                >
-                  <FaVolumeUp className={isCurrentAudio && isSpeaking ? 'text-white text-xs' : 'text-teal-700 text-xs'} />
-                  <span>{isCurrentAudio && isSpeaking ? 'Playing Voice...' : 'Listen Voice Guidance'}</span>
-                </button>
-
-                {/* 2. Pause / Resume Button — Guaranteed Responsive */}
-                <button
-                  type="button"
-                  onClick={handleDirectPauseResume}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 ${
-                    isPaused
-                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs'
-                      : isSpeaking
-                      ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 shadow-2xs'
-                      : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200/90'
-                  }`}
-                  title={isPaused ? 'Resume Voice Guidance' : 'Pause Voice Guidance'}
-                >
-                  {isPaused ? (
-                    <>
-                      <FaPlay className="text-[9px]" />
-                      <span>Resume</span>
-                    </>
+                <AnimatePresence mode="wait">
+                  {!isAudioActive ? (
+                    /* Initial State: ONLY Show "Listen Voice Guidance" */
+                    <motion.button
+                      key="btn-listen"
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        onSpeak(message.content, message.language || 'en', message.id);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80"
+                      title="Listen to Clinical Voice Guidance"
+                    >
+                      <FaVolumeUp className="text-teal-700 text-xs" />
+                      <span>Listen Voice Guidance</span>
+                    </motion.button>
                   ) : (
-                    <>
-                      <FaPause className="text-[10px] text-amber-700" />
-                      <span>Pause</span>
-                    </>
+                    /* Active State: Show Pause/Resume and Stop Buttons alongside playback badge */
+                    <motion.div
+                      key="btn-active-controls"
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -6 }}
+                      transition={{ duration: 0.2 }}
+                      className="flex items-center gap-2 flex-wrap"
+                    >
+                      {/* Active Status Badge */}
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-xs bg-teal-600 text-white shadow-xs">
+                        <FaVolumeUp className={`text-xs ${isPaused ? '' : 'animate-pulse'}`} />
+                        <span>{isPaused ? 'Voice Paused' : 'Playing Voice...'}</span>
+                      </div>
+
+                      {/* Pause / Resume Button */}
+                      <button
+                        type="button"
+                        onClick={handleDirectPauseResume}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 shadow-2xs hover:shadow-xs ${
+                          isPaused
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs'
+                            : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+                        }`}
+                        title={isPaused ? 'Resume Voice Guidance' : 'Pause Voice Guidance'}
+                      >
+                        {isPaused ? (
+                          <>
+                            <FaPlay className="text-[9px]" />
+                            <span>Resume</span>
+                          </>
+                        ) : (
+                          <>
+                            <FaPause className="text-[10px] text-amber-700" />
+                            <span>Pause</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Stop Button */}
+                      <button
+                        type="button"
+                        onClick={handleDirectStop}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200/90 shadow-2xs hover:shadow-xs"
+                        title="Stop Voice Playback"
+                      >
+                        <FaStop className="text-[9px] text-rose-600" />
+                        <span>Stop</span>
+                      </button>
+
+                      {/* Waveform indicator when actively playing */}
+                      {isSpeaking && !isPaused && (
+                        <div className="flex items-center gap-0.5 ml-1 px-2 py-1 bg-teal-50 rounded-md border border-teal-200/60">
+                          <span className="w-1 h-3 bg-teal-600 rounded-full animate-bounce [animation-delay:0.1s]" />
+                          <span className="w-1 h-4 bg-teal-600 rounded-full animate-bounce [animation-delay:0.2s]" />
+                          <span className="w-1 h-2 bg-teal-600 rounded-full animate-bounce [animation-delay:0.3s]" />
+                          <span className="text-[10px] font-bold text-teal-800 ml-1">Speaking</span>
+                        </div>
+                      )}
+                    </motion.div>
                   )}
-                </button>
-
-                {/* 3. Stop Button — Guaranteed Instant Hardware Cutoff */}
-                <button
-                  type="button"
-                  onClick={handleDirectStop}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200/90 shadow-2xs hover:shadow-xs"
-                  title="Stop Voice Playback"
-                >
-                  <FaStop className="text-[9px] text-rose-600" />
-                  <span>Stop</span>
-                </button>
-
-                {/* Animated Waveform Indicator when actively speaking */}
-                {isCurrentAudio && isSpeaking && (
-                  <div className="flex items-center gap-0.5 ml-1 px-2 py-1 bg-teal-50 rounded-md border border-teal-200/60">
-                    <span className="w-1 h-3 bg-teal-600 rounded-full animate-bounce [animation-delay:0.1s]" />
-                    <span className="w-1 h-4 bg-teal-600 rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <span className="w-1 h-2 bg-teal-600 rounded-full animate-bounce [animation-delay:0.3s]" />
-                    <span className="text-[10px] font-bold text-teal-800 ml-1">Speaking</span>
-                  </div>
-                )}
+                </AnimatePresence>
               </div>
 
               <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 font-medium">
