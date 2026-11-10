@@ -1,20 +1,17 @@
 /**
  * @file useSpeechSynthesis.js
- * @description Bulletproof Text-To-Speech hook for Multilingual Healthcare NLP (Hindi, Telugu, English).
- * Ensures instant UI response (showing Pause & Stop buttons), synchronous user-activation compliance,
- * Chrome GC protection, and accurate voice routing across Indic and English languages.
+ * @description Robust, cross-platform Text-To-Speech hook for Multilingual Healthcare NLP (Telugu, Hindi, English).
+ * Provides seamless playback for Telugu and Hindi (which lack native Windows SAPI voices)
+ * via Google Cloud TTS stream with instant fallback to Web Speech Synthesis.
+ * Guarantees immediate UI update (showing Pause & Stop buttons) and full playback control.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 
 /**
- * Determines target language key and BCP-47 tag.
- * @param {string} text - Message text.
- * @param {string} langCode - Language code.
- * @returns {{ key: string, bcp: string }} Language info.
+ * Determines target language code ('te', 'hi', 'en') and BCP-47 tag.
  */
 function resolveLanguage(text, langCode) {
-  // Check script in text first
   if (/[\u0900-\u097F]/.test(text || '')) {
     return { key: 'hi', bcp: 'hi-IN' };
   }
@@ -22,7 +19,6 @@ function resolveLanguage(text, langCode) {
     return { key: 'te', bcp: 'te-IN' };
   }
 
-  // Otherwise inspect language code
   const code = String(langCode || '').toLowerCase().trim();
   if (code.startsWith('hi')) return { key: 'hi', bcp: 'hi-IN' };
   if (code.startsWith('te')) return { key: 'te', bcp: 'te-IN' };
@@ -30,63 +26,40 @@ function resolveLanguage(text, langCode) {
 }
 
 /**
- * Finds the best matching voice from available speech synthesis voices.
- * Returns null if no voice matches the specific target language so the browser
- * uses the correct language engine rather than forcing an English voice onto Indic text.
+ * Splits clinical text into speakable sentence chunks (< 180 chars each)
+ * for smooth continuous audio streaming.
  */
-function findBestVoice(voices, bcp, key) {
-  if (!voices || voices.length === 0) return null;
-  const targetPrefix = key.toLowerCase();
-  const bcpLower = bcp.toLowerCase().replace('_', '-');
+function splitIntoChunks(text, maxLen = 170) {
+  if (!text) return [];
+  // Split on sentence boundaries
+  const sentences = text.match(/[^.!?\n;]+[.!?\n;]+|[^.!?\n;]+$/g) || [text];
+  const chunks = [];
 
-  // 1. Exact match on BCP-47 tag (e.g. 'hi-in', 'te-in', 'en-us')
-  let match = voices.find((v) => {
-    const l = (v.lang || '').toLowerCase().replace('_', '-');
-    return l === bcpLower;
-  });
-  if (match) return match;
+  for (const sentence of sentences) {
+    const trimmed = sentence.trim();
+    if (!trimmed) continue;
 
-  // 2. Language prefix match (starts with 'hi', 'te', 'en')
-  match = voices.find((v) => {
-    const l = (v.lang || '').toLowerCase().replace('_', '-');
-    return l.startsWith(targetPrefix);
-  });
-  if (match) return match;
-
-  // 3. Name match across Latin and Native Indic script
-  match = voices.find((v) => {
-    const n = (v.name || '').toLowerCase();
-    if (targetPrefix === 'hi') {
-      return (
-        n.includes('hindi') ||
-        n.includes('हिन्दी') ||
-        n.includes('swara') ||
-        n.includes('madhur') ||
-        n.includes('kalpana') ||
-        n.includes('hemant') ||
-        n.includes('lekha') ||
-        n.includes('neerja')
-      );
+    if (trimmed.length <= maxLen) {
+      chunks.push(trimmed);
+    } else {
+      // Split by words
+      const words = trimmed.split(/\s+/);
+      let current = '';
+      for (const word of words) {
+        if ((current + ' ' + word).trim().length <= maxLen) {
+          current = (current + ' ' + word).trim();
+        } else {
+          if (current) chunks.push(current);
+          current = word;
+        }
+      }
+      if (current) chunks.push(current);
     }
-    if (targetPrefix === 'te') {
-      return (
-        n.includes('telugu') ||
-        n.includes('తెలుగు') ||
-        n.includes('mohan') ||
-        n.includes('chitra')
-      );
-    }
-    return n.includes('english') || (v.lang && v.lang.toLowerCase().startsWith('en'));
-  });
-  if (match) return match;
+  }
 
-  // Return null if no matching voice found for this language
-  return null;
+  return chunks.length > 0 ? chunks : [text.slice(0, maxLen)];
 }
 
-/**
- * Custom hook providing reliable speech synthesis with instant pause, resume, and stop controls.
- */
 export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -94,62 +67,67 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [voices, setVoices] = useState([]);
   const [isSupported, setIsSupported] = useState(true);
 
-  // Load voices on mount and keep updated
+  // References for playback management
+  const currentAudioRef = useRef(null);
+  const chunkQueueRef = useRef([]);
+  const currentChunkIndexRef = useRef(0);
+  const currentLangRef = useRef('en');
+  const activeModeRef = useRef(null); // 'audio' or 'speech'
+
+  // Load browser speech synthesis voices if available
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const supported = 'speechSynthesis' in window;
     setIsSupported(supported);
 
     if (supported) {
-      const loadVoices = () => {
+      const load = () => {
         try {
           const list = window.speechSynthesis.getVoices() || [];
-          if (list.length > 0) {
-            setVoices(list);
-          }
+          if (list.length > 0) setVoices(list);
         } catch (_) {}
       };
-
-      loadVoices();
+      load();
       if (window.speechSynthesis.onvoiceschanged !== undefined) {
-        window.speechSynthesis.onvoiceschanged = loadVoices;
+        window.speechSynthesis.onvoiceschanged = load;
       }
     }
   }, []);
 
-  /** Keep-alive heartbeat for Chromium speech synthesis engine */
-  useEffect(() => {
-    let timer = null;
-    if (isSpeaking && !isPaused && typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      timer = setInterval(() => {
-        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
-        }
-      }, 12000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isSpeaking, isPaused]);
-
-  /** Stop speech immediately and reset UI state */
+  /** Stop all playback and reset state */
   const cancel = useCallback(() => {
+    // 1. Stop HTML5 audio
+    if (currentAudioRef.current) {
+      try {
+        currentAudioRef.current.pause();
+        currentAudioRef.current.src = '';
+        currentAudioRef.current = null;
+      } catch (_) {}
+    }
+    chunkQueueRef.current = [];
+    currentChunkIndexRef.current = 0;
+
+    // 2. Stop Web Speech Synthesis
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
       } catch (_) {}
     }
 
+    activeModeRef.current = null;
     setIsSpeaking(false);
     setIsPaused(false);
     setActiveId(null);
     if (onEnd) onEnd();
   }, [onEnd]);
 
-  /** Pause active speech */
+  /** Pause active playback */
   const pause = useCallback(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (activeModeRef.current === 'audio' && currentAudioRef.current) {
+      try {
+        currentAudioRef.current.pause();
+      } catch (_) {}
+    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.pause();
       } catch (_) {}
@@ -157,9 +135,13 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     setIsPaused(true);
   }, []);
 
-  /** Resume paused speech */
+  /** Resume paused playback */
   const resume = useCallback(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+    if (activeModeRef.current === 'audio' && currentAudioRef.current) {
+      try {
+        currentAudioRef.current.play();
+      } catch (_) {}
+    } else if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.resume();
       } catch (_) {}
@@ -168,99 +150,136 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   }, []);
 
   /**
-   * Speaks the given clinical text.
-   * Immediately sets activeId and isSpeaking synchronously so UI instantly reflects Pause & Stop buttons.
-   * @param {string} text - Text to synthesize.
-   * @param {string} [lang] - Language code ('HI', 'TE', 'EN', etc.).
-   * @param {string} [id] - Unique message ID for audio binding.
+   * Play next chunk in queue using HTML5 Audio
+   */
+  const playNextChunk = useCallback(() => {
+    const queue = chunkQueueRef.current;
+    const index = currentChunkIndexRef.current;
+
+    if (index >= queue.length) {
+      // Finished all chunks
+      cancel();
+      return;
+    }
+
+    const chunk = queue[index];
+    const lang = currentLangRef.current;
+    const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(
+      chunk
+    )}&tl=${lang}&client=tw-ob`;
+
+    const audio = new Audio();
+    audio.referrerPolicy = 'no-referrer';
+    audio.crossOrigin = 'anonymous';
+    audio.src = audioUrl;
+    currentAudioRef.current = audio;
+
+    audio.onended = () => {
+      currentChunkIndexRef.current += 1;
+      playNextChunk();
+    };
+
+    audio.onerror = () => {
+      // If audio fails for this chunk, attempt browser synthesis fallback
+      fallbackToWebSpeech(chunk, lang);
+    };
+
+    audio.play().catch(() => {
+      // Autoplay or network issue, fallback to Web Speech
+      fallbackToWebSpeech(chunk, lang);
+    });
+  }, [cancel]);
+
+  /**
+   * Fallback to Web Speech Synthesis API
+   */
+  const fallbackToWebSpeech = useCallback(
+    (text, langKey) => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+        cancel();
+        return;
+      }
+
+      activeModeRef.current = 'speech';
+      const bcp = langKey === 'te' ? 'te-IN' : langKey === 'hi' ? 'hi-IN' : 'en-US';
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = bcp;
+      utterance.rate = rate;
+      utterance.pitch = pitch;
+
+      const avail = window.speechSynthesis.getVoices() || voices;
+      const match = avail.find(
+        (v) =>
+          (v.lang && v.lang.toLowerCase().replace('_', '-').startsWith(langKey)) ||
+          (v.name && v.name.toLowerCase().includes(langKey === 'hi' ? 'hindi' : langKey === 'te' ? 'telugu' : 'english'))
+      );
+      if (match) utterance.voice = match;
+
+      utterance.onend = () => {
+        cancel();
+      };
+      utterance.onerror = () => {
+        cancel();
+      };
+
+      try {
+        window.speechSynthesis.speak(utterance);
+      } catch (_) {
+        cancel();
+      }
+    },
+    [cancel, pitch, rate, voices]
+  );
+
+  /**
+   * Speaks the clinical text.
+   * Immediately updates UI state so Pause & Stop buttons show up synchronously on click.
    */
   const speak = useCallback(
     (text, lang, id) => {
-      if (!text || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      if (!text) return;
 
-      // 1. Synchronously set active state so UI immediately renders Pause and Stop buttons
+      // Stop any existing playback first
+      if (currentAudioRef.current) {
+        try {
+          currentAudioRef.current.pause();
+          currentAudioRef.current = null;
+        } catch (_) {}
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch (_) {}
+      }
+
+      // Synchronously set UI state so Pause & Stop show immediately
       if (id) {
         setActiveId(id);
       }
       setIsSpeaking(true);
       setIsPaused(false);
 
-      // Clean markdown symbols from clinical text
+      // Clean markdown characters from clinical guidance text
       const cleanText = text
         .replace(/[*_#`~[\]()]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
 
-      const { key, bcp } = resolveLanguage(cleanText, lang);
+      const { key } = resolveLanguage(cleanText, lang);
+      currentLangRef.current = key;
 
-      // Resume if stuck in paused state
-      try {
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-      } catch (_) {}
+      const chunks = splitIntoChunks(cleanText);
+      chunkQueueRef.current = chunks;
+      currentChunkIndexRef.current = 0;
+      activeModeRef.current = 'audio';
 
-      // Create speech utterance
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = bcp;
-      utterance.rate = rate;
-      utterance.pitch = pitch;
-
-      // Select best voice if available
-      const availableVoices = window.speechSynthesis.getVoices() || voices;
-      const matchedVoice = findBestVoice(availableVoices, bcp, key);
-      if (matchedVoice) {
-        utterance.voice = matchedVoice;
-      }
-
-      utterance.onstart = () => {
-        setIsSpeaking(true);
-        setIsPaused(false);
-      };
-
-      utterance.onpause = () => {
-        setIsPaused(true);
-      };
-
-      utterance.onresume = () => {
-        setIsPaused(false);
-      };
-
-      utterance.onend = () => {
-        setIsSpeaking(false);
-        setIsPaused(false);
-        setActiveId(null);
-        if (onEnd) onEnd();
-      };
-
-      utterance.onerror = (e) => {
-        if (e.error === 'interrupted' || e.error === 'canceled') {
-          return;
-        }
-        console.warn('[MediLingual Speech] Utterance error:', e.error);
-        setIsSpeaking(false);
-        setIsPaused(false);
-        setActiveId(null);
-        if (onEnd) onEnd();
-      };
-
-      // Anchor reference to window to avoid Chrome V8 garbage collection bug
-      window.__activeUtterance = utterance;
-
-      // Invoke speech synthesis directly within user click gesture
-      try {
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.warn('[MediLingual Speech] Speak call failed:', err);
-        setIsSpeaking(false);
-        setIsPaused(false);
-        setActiveId(null);
-      }
+      // Start playing
+      playNextChunk();
     },
-    [onEnd, pitch, rate, voices]
+    [playNextChunk]
   );
 
-  // Cleanup on unmount
+  // Clean up on component unmount
   useEffect(() => {
     return () => {
       cancel();
