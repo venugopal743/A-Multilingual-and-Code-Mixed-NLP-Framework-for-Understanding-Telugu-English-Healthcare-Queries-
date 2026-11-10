@@ -10,6 +10,7 @@ import {
   FaPlay,
   FaStop,
 } from 'react-icons/fa';
+import { preloadAudio } from '../../hooks/useSpeechSynthesis';
 
 export default function ChatMessage({
   message,
@@ -167,13 +168,14 @@ export default function ChatMessage({
                       exit={{ opacity: 0, scale: 0.95 }}
                       transition={{ duration: 0.15 }}
                       type="button"
+                      onMouseEnter={() => preloadAudio(message.content, message.language || 'en')}
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         onSpeak(message.content, message.language || 'en', message.id);
                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200/80"
-                      title="Listen to Clinical Voice Guidance"
+                      title="Listen to Clinical Voice Guidance (Instant)"
                     >
                       <FaVolumeUp className="text-teal-700 text-xs" />
                       <span>Listen Voice Guidance</span>
