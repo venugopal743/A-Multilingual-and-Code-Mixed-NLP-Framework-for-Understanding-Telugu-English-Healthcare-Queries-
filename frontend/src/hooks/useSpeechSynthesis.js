@@ -1,8 +1,8 @@
 /**
  * @file useSpeechSynthesis.js
- * @description Resilient, high-definition Text-To-Speech hook for Multilingual Healthcare NLP (Hindi, Telugu, English).
- * Combines Google Neural TTS Audio streaming with native Web Speech API fallback to ensure 100% reliable
- * voice guidance, instant Pause/Stop state transitions, and authentic multilingual playback.
+ * @description Resilient Text-To-Speech hook for Multilingual Healthcare NLP (Hindi, Telugu, English).
+ * Utilizes native Web Speech API for English and installed Indic voices, with neural audio fallback
+ * for Indic languages when local OS voice packs are missing.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -30,10 +30,59 @@ function resolveLanguage(text, langCode) {
 }
 
 /**
+ * Finds the best matching voice from the browser's available speech synthesis voices.
+ */
+function findBestVoice(voices, bcp, key) {
+  if (!voices || voices.length === 0) return null;
+  const targetPrefix = key.toLowerCase();
+  const bcpLower = bcp.toLowerCase().replace('_', '-');
+
+  // 1. Exact match on BCP-47 tag (e.g. 'hi-in', 'te-in', 'en-us')
+  let match = voices.find((v) => {
+    const l = (v.lang || '').toLowerCase().replace('_', '-');
+    return l === bcpLower;
+  });
+  if (match) return match;
+
+  // 2. Language prefix match (starts with 'hi', 'te', 'en')
+  match = voices.find((v) => {
+    const l = (v.lang || '').toLowerCase().replace('_', '-');
+    return l.startsWith(targetPrefix);
+  });
+  if (match) return match;
+
+  // 3. Name match across Latin and Native Indic script
+  match = voices.find((v) => {
+    const n = (v.name || '').toLowerCase();
+    if (targetPrefix === 'hi') {
+      return (
+        n.includes('hindi') ||
+        n.includes('हिन्दी') ||
+        n.includes('swara') ||
+        n.includes('madhur') ||
+        n.includes('kalpana') ||
+        n.includes('hemant') ||
+        n.includes('lekha') ||
+        n.includes('neerja')
+      );
+    }
+    if (targetPrefix === 'te') {
+      return (
+        n.includes('telugu') ||
+        n.includes('తెలుగు') ||
+        n.includes('mohan') ||
+        n.includes('chitra')
+      );
+    }
+    return n.includes('english') || (v.lang && v.lang.toLowerCase().startsWith('en'));
+  });
+  if (match) return match;
+
+  return voices.find((v) => v.default) || voices[0] || null;
+}
+
+/**
  * Splits text into natural sentence chunks (<= 140 chars) for smooth streaming.
- * @param {string} text - Clean input text.
- * @param {number} maxLen - Max characters per chunk.
- * @returns {string[]} Array of sentence chunks.
  */
 function chunkText(text, maxLen = 140) {
   if (!text) return [];
@@ -43,7 +92,6 @@ function chunkText(text, maxLen = 140) {
     .trim();
   if (clean.length <= maxLen) return [clean];
 
-  // Split on Hindi danda (।), full stop, question mark, exclamation, or comma
   const parts = clean.split(/(?<=[|।?!,\n])/);
   const chunks = [];
   let current = '';
@@ -63,7 +111,7 @@ function chunkText(text, maxLen = 140) {
 }
 
 /**
- * Custom hook providing reliable speech synthesis with full pause, resume, and stop controls.
+ * Custom hook providing reliable speech synthesis with instant pause, resume, and stop controls.
  */
 export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -74,11 +122,12 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
 
   const audioRef = useRef(null);
   const utteranceRef = useRef(null);
-  const activeModeRef = useRef('audio'); // 'audio' or 'synth'
+  const activeModeRef = useRef('synth'); // 'synth' or 'audio'
+  const isCancellingRef = useRef(false);
   const chunkQueueRef = useRef([]);
   const currentLangRef = useRef('en');
 
-  // Initialize and load browser voices
+  // Load voices on mount and on voiceschanged event
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const supported = 'speechSynthesis' in window;
@@ -88,7 +137,9 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       const loadVoices = () => {
         try {
           const list = window.speechSynthesis.getVoices() || [];
-          setVoices(list);
+          if (list.length > 0) {
+            setVoices(list);
+          }
         } catch (_) {}
       };
 
@@ -99,8 +150,9 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     }
   }, []);
 
-  /** Stop active speech immediately and reset all state */
+  /** Stop active speech immediately */
   const cancel = useCallback(() => {
+    isCancellingRef.current = true;
     chunkQueueRef.current = [];
 
     // 1. Stop audio playback if active
@@ -123,10 +175,14 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     setIsPaused(false);
     setActiveId(null);
     if (onEnd) onEnd();
+
+    setTimeout(() => {
+      isCancellingRef.current = false;
+    }, 100);
   }, [onEnd]);
 
-  /** Fallback: Native browser Web Speech API */
-  const speakNative = useCallback((cleanText, bcp) => {
+  /** Speaks via native Web Speech API */
+  const speakNative = useCallback((cleanText, bcp, key) => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setIsSpeaking(false);
       setIsPaused(false);
@@ -138,30 +194,23 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
+      isCancellingRef.current = true;
       window.speechSynthesis.cancel();
     } catch (_) {}
+
+    setTimeout(() => {
+      isCancellingRef.current = false;
+    }, 50);
 
     const utterance = new SpeechSynthesisUtterance(cleanText);
     utterance.lang = bcp;
     utterance.rate = rate;
     utterance.pitch = pitch;
 
-    const available = window.speechSynthesis.getVoices() || voices;
-    if (available && available.length > 0) {
-      const targetPrefix = bcp.split('-')[0].toLowerCase();
-      const matched = available.find((v) => {
-        const vLang = (v.lang || '').toLowerCase().replace('_', '-');
-        const vName = (v.name || '').toLowerCase();
-        return (
-          vLang.startsWith(targetPrefix) ||
-          (targetPrefix === 'hi' && (vName.includes('hindi') || vName.includes('swara') || vName.includes('kalpana') || vName.includes('hemant') || vName.includes('madhur'))) ||
-          (targetPrefix === 'te' && (vName.includes('telugu') || vName.includes('mohan'))) ||
-          (targetPrefix === 'en' && vLang.startsWith('en'))
-        );
-      });
-      if (matched) {
-        utterance.voice = matched;
-      }
+    const availableVoices = window.speechSynthesis.getVoices() || voices;
+    const matchedVoice = findBestVoice(availableVoices, bcp, key);
+    if (matchedVoice) {
+      utterance.voice = matchedVoice;
     }
 
     utterance.onstart = () => {
@@ -169,7 +218,16 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       setIsPaused(false);
     };
 
+    utterance.onpause = () => {
+      setIsPaused(true);
+    };
+
+    utterance.onresume = () => {
+      setIsPaused(false);
+    };
+
     utterance.onend = () => {
+      if (isCancellingRef.current) return;
       setIsSpeaking(false);
       setIsPaused(false);
       setActiveId(null);
@@ -177,11 +235,10 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     };
 
     utterance.onerror = (e) => {
-      // Ignore deliberate cancellations from previous speak calls
-      if (e.error === 'interrupted' || e.error === 'canceled') {
+      if (isCancellingRef.current || e.error === 'interrupted' || e.error === 'canceled') {
         return;
       }
-      console.warn('[MediLingual Speech] Native utterance error:', e);
+      console.warn('[MediLingual Speech] Utterance error:', e.error);
       setIsSpeaking(false);
       setIsPaused(false);
       setActiveId(null);
@@ -190,8 +247,6 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
 
     utteranceRef.current = utterance;
     activeModeRef.current = 'synth';
-    setIsSpeaking(true);
-    setIsPaused(false);
 
     try {
       window.speechSynthesis.speak(utterance);
@@ -203,8 +258,8 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     }
   }, [onEnd, pitch, rate, voices]);
 
-  /** Helper to play audio chunks sequentially */
-  const playNextChunk = useCallback(() => {
+  /** Plays audio chunks sequentially for Indic fallback */
+  const playNextAudioChunk = useCallback(() => {
     if (chunkQueueRef.current.length === 0) {
       setIsSpeaking(false);
       setIsPaused(false);
@@ -218,7 +273,9 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     const langKey = currentLangRef.current;
     const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${langKey}&q=${encodeURIComponent(nextChunk)}`;
 
-    const audio = new Audio(audioUrl);
+    const audio = new Audio();
+    audio.referrerPolicy = 'no-referrer';
+    audio.src = audioUrl;
     audioRef.current = audio;
     activeModeRef.current = 'audio';
 
@@ -227,13 +284,17 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       setIsPaused(false);
     };
 
+    audio.onpause = () => {
+      setIsPaused(true);
+    };
+
     audio.onended = () => {
-      playNextChunk();
+      playNextAudioChunk();
     };
 
     audio.onerror = (err) => {
-      console.warn('[MediLingual Speech] Audio stream failed, falling back:', err);
-      speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US');
+      console.warn('[MediLingual Speech] Audio stream failed, falling back to native:', err);
+      speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US', langKey);
     };
 
     try {
@@ -241,17 +302,17 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       if (p !== undefined) {
         p.catch((err) => {
           console.warn('[MediLingual Speech] Audio play promise failed:', err);
-          speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US');
+          speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US', langKey);
         });
       }
     } catch (err) {
-      speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US');
+      speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US', langKey);
     }
   }, [onEnd, speakNative]);
 
   /**
    * Speaks the given clinical text.
-   * Immediately sets activeId and isSpeaking so UI instantly reflects Pause / Stop buttons.
+   * Immediately sets activeId and isSpeaking so UI instantly displays Pause and Stop buttons.
    * @param {string} text - Text to synthesize.
    * @param {string} [lang] - Language code ('HI', 'TE', 'EN', etc.).
    * @param {string} [id] - Unique message ID for audio binding.
@@ -260,26 +321,12 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     (text, lang, id) => {
       if (!text || typeof window === 'undefined') return;
 
-      // 1. Immediately bind active state synchronously so UI shows Pause/Stop
+      // 1. Immediately bind active state synchronously so UI displays Pause & Stop buttons
       if (id) {
         setActiveId(id);
       }
       setIsSpeaking(true);
       setIsPaused(false);
-
-      // Stop previous audio playback (without wiping the new activeId)
-      if (audioRef.current) {
-        try {
-          audioRef.current.pause();
-          audioRef.current.currentTime = 0;
-          audioRef.current = null;
-        } catch (_) {}
-      }
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        try {
-          window.speechSynthesis.cancel();
-        } catch (_) {}
-      }
 
       // Clean markdown symbols
       const cleanText = text
@@ -290,15 +337,49 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       const { key, bcp } = resolveLanguage(cleanText, lang);
       currentLangRef.current = key;
 
-      const chunks = chunkText(cleanText, 140);
-      if (chunks.length > 0) {
-        chunkQueueRef.current = [...chunks];
-        playNextChunk();
+      // Check if browser has an installed native voice for this language
+      const availableVoices = (typeof window !== 'undefined' && 'speechSynthesis' in window)
+        ? (window.speechSynthesis.getVoices() || voices)
+        : [];
+      
+      const hasSpecificVoice = availableVoices.some((v) => {
+        const vLang = (v.lang || '').toLowerCase().replace('_', '-');
+        const vName = (v.name || '').toLowerCase();
+        if (key === 'hi') {
+          return (
+            vLang.startsWith('hi') ||
+            vName.includes('hindi') ||
+            vName.includes('हिन्दी') ||
+            vName.includes('swara') ||
+            vName.includes('madhur')
+          );
+        }
+        if (key === 'te') {
+          return (
+            vLang.startsWith('te') ||
+            vName.includes('telugu') ||
+            vName.includes('తెలుగు') ||
+            vName.includes('mohan')
+          );
+        }
+        return vLang.startsWith('en');
+      });
+
+      // For English OR when a native voice exists: use native Web Speech API
+      if (key === 'en' || hasSpecificVoice) {
+        speakNative(cleanText, bcp, key);
       } else {
-        speakNative(cleanText, bcp);
+        // For Indic languages without local OS voice packs: stream via neural audio
+        const chunks = chunkText(cleanText, 140);
+        if (chunks.length > 0) {
+          chunkQueueRef.current = [...chunks];
+          playNextAudioChunk();
+        } else {
+          speakNative(cleanText, bcp, key);
+        }
       }
     },
-    [playNextChunk, speakNative]
+    [playNextAudioChunk, speakNative, voices]
   );
 
   /** Pause active speech */
