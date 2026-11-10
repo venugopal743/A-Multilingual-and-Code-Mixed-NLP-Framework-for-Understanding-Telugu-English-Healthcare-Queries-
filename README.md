@@ -6,6 +6,14 @@
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/venugopal743/A-Multilingual-and-Code-Mixed-NLP-Framework-for-Understanding-Telugu-English-Healthcare-Queries-)
 [![Render](https://img.shields.io/badge/Deploy%20on-Render-46E3B7?style=flat&logo=render&logoColor=white)](https://render.com)
 
+[![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-medilingual--ai--frontend.onrender.com-0EA5E9?style=for-the-badge&logo=render&logoColor=white)](https://medilingual-ai-frontend.onrender.com)
+
+> ### 🌐 **Live Deployed Application:**
+> 👉 **[https://medilingual-ai-frontend.onrender.com](https://medilingual-ai-frontend.onrender.com)**  
+> *Click to open the live healthcare portal. Full-stack clinical consultation in Telugu, Hindi & English, Medical NER, FAISS Knowledge Base, and interactive voice guidance (Play/Pause/Stop) are active in production!*
+
+---
+
 A clinical natural language processing framework built to understand patient inquiries in **Telugu**, **Hindi**, **English**, and **Romanized Code-Mixed dialects** (e.g., Telugu-English *"Naaku 2 days nunchi fever undi"*, Hindi-English *"Mujhe kal se sar dard hai"*).
 
 ---
@@ -133,13 +141,14 @@ multilingual-healthcare-nlp/
 
 ## ☁️ Deployment on Render
 
-This repository includes a production-ready **Render Blueprint (`render.yaml`)** to deploy the full stack automatically to [Render](https://render.com):
+### 🌐 Live Production Application:
+👉 **[https://medilingual-ai-frontend.onrender.com](https://medilingual-ai-frontend.onrender.com)**
 
-| Service | Type | Path | Runtime | Description |
+| Service | Type | Live URL / Path | Runtime | Description |
 |---|---|---|---|---|
-| **`medilingual-ai-frontend`** | Static Site | `/frontend` | Static (Vite) | Global CDN, SPA rewrite routing, instant load |
-| **`medilingual-backend`** | Web Service | `/backend` | Node.js (Express) | Patient session logging, EHR export, health check |
-| **`medilingual-nlp-engine`** | Web Service | `/nlp-engine` | Python (FastAPI) | Clinical NER, MuRIL/XLM-R language identification, FAISS |
+| **`medilingual-ai-frontend`** | Static Site | [medilingual-ai-frontend.onrender.com](https://medilingual-ai-frontend.onrender.com) | Static (Vite) | Production Frontend with full multilingual triage, voice output & FAISS RAG |
+| **`medilingual-backend`** | Web Service | `medilingual-backend.onrender.com` | Node.js (Express) | Patient session logging, EHR export, health check |
+| **`medilingual-nlp-engine`** | Web Service | `medilingual-nlp-engine.onrender.com` | Python (FastAPI) | Clinical NER, MuRIL/XLM-R language identification, FAISS |
 
 ### One-Click Deploy to Render
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/venugopal743/A-Multilingual-and-Code-Mixed-NLP-Framework-for-Understanding-Telugu-English-Healthcare-Queries-)
