@@ -39,6 +39,7 @@ export default function ChatPage() {
   const {
     isSpeaking,
     isPaused,
+    activeId,
     speak,
     pause,
     resume,
