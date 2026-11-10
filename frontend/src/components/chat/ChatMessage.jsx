@@ -17,11 +17,88 @@ export default function ChatMessage({
   onSpeak,
   onPause,
   onResume,
-  onStop
+  onStop,
 }) {
   const isUser = message.role === 'user';
   const { isSpeaking = false, isPaused = false, activeId = null } = speechState;
   const isCurrentAudio = Boolean(activeId && activeId === message.id);
+
+  /** Direct hardware stop for instantaneous silence */
+  const handleDirectStop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // 1. Immediately kill HTML5 Audio
+    if (typeof window !== 'undefined' && window.__MEDILINGUAL_AUDIO__) {
+      try {
+        window.__MEDILINGUAL_AUDIO__.pause();
+        window.__MEDILINGUAL_AUDIO__.currentTime = 0;
+        window.__MEDILINGUAL_AUDIO__.src = '';
+      } catch (_) {}
+    }
+
+    // 2. Immediately cancel Web Speech
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.pause();
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
+
+    if (typeof window !== 'undefined') {
+      window.__IS_MEDILINGUAL_PAUSED__ = false;
+      window.__MEDILINGUAL_RESUME__ = null;
+    }
+
+    // 3. Update React state
+    if (onStop) onStop();
+  };
+
+  /** Direct hardware pause / resume toggle */
+  const handleDirectPauseResume = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (isPaused) {
+      // RESUME
+      if (typeof window !== 'undefined') {
+        window.__IS_MEDILINGUAL_PAUSED__ = false;
+        if (
+          window.__MEDILINGUAL_AUDIO__ &&
+          window.__MEDILINGUAL_AUDIO__.src &&
+          window.__MEDILINGUAL_AUDIO__.src !== window.location.href &&
+          !window.__MEDILINGUAL_AUDIO__.ended
+        ) {
+          try {
+            window.__MEDILINGUAL_AUDIO__.play().catch(() => {});
+          } catch (_) {}
+        }
+        if ('speechSynthesis' in window && window.speechSynthesis.paused) {
+          try {
+            window.speechSynthesis.resume();
+          } catch (_) {}
+        }
+      }
+      if (onResume) onResume();
+    } else {
+      // PAUSE
+      if (typeof window !== 'undefined') {
+        window.__IS_MEDILINGUAL_PAUSED__ = true;
+        if (window.__MEDILINGUAL_AUDIO__) {
+          try {
+            window.__MEDILINGUAL_AUDIO__.pause();
+          } catch (_) {}
+        }
+        if ('speechSynthesis' in window) {
+          try {
+            window.speechSynthesis.pause();
+          } catch (_) {}
+        }
+      }
+      if (onPause) onPause();
+    }
+  };
 
   return (
     <motion.div
@@ -76,11 +153,15 @@ export default function ChatMessage({
           {/* Dedicated Voice Output Controls: Listen, Pause/Resume, Stop */}
           {!isUser && onSpeak && (
             <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
                 {/* 1. Play / Listen Voice Guidance Button */}
                 <button
                   type="button"
-                  onClick={() => onSpeak(message.content, message.language || 'en', message.id)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSpeak(message.content, message.language || 'en', message.id);
+                  }}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer ${
                     isCurrentAudio && isSpeaking
                       ? 'bg-teal-600 text-white shadow-sm'
@@ -92,22 +173,16 @@ export default function ChatMessage({
                   <span>{isCurrentAudio && isSpeaking ? 'Playing Voice...' : 'Listen Voice Guidance'}</span>
                 </button>
 
-                {/* 2. Pause / Resume Button — Always Clickable */}
+                {/* 2. Pause / Resume Button — Guaranteed Responsive */}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (isPaused) {
-                      onResume();
-                    } else {
-                      onPause();
-                    }
-                  }}
+                  onClick={handleDirectPauseResume}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 ${
                     isPaused
-                      ? 'bg-teal-600 hover:bg-teal-700 text-white border-teal-600 shadow-xs'
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600 shadow-xs'
                       : isSpeaking
                       ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 shadow-2xs'
-                      : 'bg-amber-50/80 hover:bg-amber-100 text-amber-800 border-amber-200/90'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200/90'
                   }`}
                   title={isPaused ? 'Resume Voice Guidance' : 'Pause Voice Guidance'}
                 >
@@ -124,10 +199,10 @@ export default function ChatMessage({
                   )}
                 </button>
 
-                {/* 3. Stop Button — Always Clickable */}
+                {/* 3. Stop Button — Guaranteed Instant Hardware Cutoff */}
                 <button
                   type="button"
-                  onClick={() => onStop()}
+                  onClick={handleDirectStop}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all text-xs border cursor-pointer active:scale-95 bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-200/90 shadow-2xs hover:shadow-xs"
                   title="Stop Voice Playback"
                 >
