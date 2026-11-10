@@ -2,7 +2,7 @@
  * @file useSpeechSynthesis.js
  * @description Resilient, high-definition Text-To-Speech hook for Multilingual Healthcare NLP (Hindi, Telugu, English).
  * Combines Google Neural TTS Audio streaming with native Web Speech API fallback to ensure 100% reliable
- * voice guidance on all browsers and operating systems, even when regional Indic OS language packs are missing.
+ * voice guidance, instant Pause/Stop state transitions, and authentic multilingual playback.
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -68,12 +68,15 @@ function chunkText(text, maxLen = 140) {
 export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [activeId, setActiveId] = useState(null);
   const [voices, setVoices] = useState([]);
   const [isSupported, setIsSupported] = useState(true);
 
   const audioRef = useRef(null);
   const utteranceRef = useRef(null);
   const activeModeRef = useRef('audio'); // 'audio' or 'synth'
+  const chunkQueueRef = useRef([]);
+  const currentLangRef = useRef('en');
 
   // Initialize and load browser voices
   useEffect(() => {
@@ -96,8 +99,10 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     }
   }, []);
 
-  /** Stop active speech immediately */
+  /** Stop active speech immediately and reset all state */
   const cancel = useCallback(() => {
+    chunkQueueRef.current = [];
+
     // 1. Stop audio playback if active
     if (audioRef.current) {
       try {
@@ -116,69 +121,18 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
 
     setIsSpeaking(false);
     setIsPaused(false);
-  }, []);
+    setActiveId(null);
+    if (onEnd) onEnd();
+  }, [onEnd]);
 
-  /**
-   * Internal helper to play chunks sequentially using Neural Audio Stream.
-   */
-  const playAudioChunks = useCallback((chunks, langKey, onComplete, onFallback) => {
-    if (!chunks || chunks.length === 0) {
+  /** Fallback: Native browser Web Speech API */
+  const speakNative = useCallback((cleanText, bcp) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
       setIsSpeaking(false);
       setIsPaused(false);
-      if (onComplete) onComplete();
+      setActiveId(null);
       return;
     }
-
-    const currentChunk = chunks[0];
-    const remainingChunks = chunks.slice(1);
-    const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${langKey}&q=${encodeURIComponent(currentChunk)}`;
-
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-    activeModeRef.current = 'audio';
-
-    audio.onplay = () => {
-      setIsSpeaking(true);
-      setIsPaused(false);
-    };
-
-    audio.onended = () => {
-      if (remainingChunks.length > 0) {
-        playAudioChunks(remainingChunks, langKey, onComplete, onFallback);
-      } else {
-        audioRef.current = null;
-        setIsSpeaking(false);
-        setIsPaused(false);
-        if (onComplete) onComplete();
-      }
-    };
-
-    audio.onerror = (err) => {
-      console.warn('[MediLingual Speech] Audio stream failed, falling back to Web Speech:', err);
-      audioRef.current = null;
-      if (onFallback) onFallback();
-    };
-
-    try {
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise.catch((err) => {
-          console.warn('[MediLingual Speech] Audio play promise rejected:', err);
-          audioRef.current = null;
-          if (onFallback) onFallback();
-        });
-      }
-    } catch (err) {
-      console.warn('[MediLingual Speech] Audio invocation failed:', err);
-      if (onFallback) onFallback();
-    }
-  }, []);
-
-  /**
-   * Fallback: Native browser Web Speech API
-   */
-  const speakNative = useCallback((cleanText, bcp) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
 
     try {
       if (window.speechSynthesis.paused) {
@@ -218,13 +172,19 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     utterance.onend = () => {
       setIsSpeaking(false);
       setIsPaused(false);
+      setActiveId(null);
       if (onEnd) onEnd();
     };
 
     utterance.onerror = (e) => {
+      // Ignore deliberate cancellations from previous speak calls
+      if (e.error === 'interrupted' || e.error === 'canceled') {
+        return;
+      }
       console.warn('[MediLingual Speech] Native utterance error:', e);
       setIsSpeaking(false);
       setIsPaused(false);
+      setActiveId(null);
       if (onEnd) onEnd();
     };
 
@@ -239,22 +199,87 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       console.warn('[MediLingual Speech] Native speak call failed:', err);
       setIsSpeaking(false);
       setIsPaused(false);
+      setActiveId(null);
     }
   }, [onEnd, pitch, rate, voices]);
 
+  /** Helper to play audio chunks sequentially */
+  const playNextChunk = useCallback(() => {
+    if (chunkQueueRef.current.length === 0) {
+      setIsSpeaking(false);
+      setIsPaused(false);
+      setActiveId(null);
+      audioRef.current = null;
+      if (onEnd) onEnd();
+      return;
+    }
+
+    const nextChunk = chunkQueueRef.current.shift();
+    const langKey = currentLangRef.current;
+    const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${langKey}&q=${encodeURIComponent(nextChunk)}`;
+
+    const audio = new Audio(audioUrl);
+    audioRef.current = audio;
+    activeModeRef.current = 'audio';
+
+    audio.onplay = () => {
+      setIsSpeaking(true);
+      setIsPaused(false);
+    };
+
+    audio.onended = () => {
+      playNextChunk();
+    };
+
+    audio.onerror = (err) => {
+      console.warn('[MediLingual Speech] Audio stream failed, falling back:', err);
+      speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US');
+    };
+
+    try {
+      const p = audio.play();
+      if (p !== undefined) {
+        p.catch((err) => {
+          console.warn('[MediLingual Speech] Audio play promise failed:', err);
+          speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US');
+        });
+      }
+    } catch (err) {
+      speakNative(nextChunk, langKey === 'hi' ? 'hi-IN' : langKey === 'te' ? 'te-IN' : 'en-US');
+    }
+  }, [onEnd, speakNative]);
+
   /**
    * Speaks the given clinical text.
-   * Prioritizes high-fidelity Neural TTS Audio for Hindi & Telugu (ensuring 100% functionality on all OS),
-   * with seamless Web Speech API integration.
+   * Immediately sets activeId and isSpeaking so UI instantly reflects Pause / Stop buttons.
    * @param {string} text - Text to synthesize.
-   * @param {string} [lang] - Language code or label ('HI', 'TE', 'EN', etc.).
+   * @param {string} [lang] - Language code ('HI', 'TE', 'EN', etc.).
+   * @param {string} [id] - Unique message ID for audio binding.
    */
   const speak = useCallback(
-    (text, lang) => {
+    (text, lang, id) => {
       if (!text || typeof window === 'undefined') return;
 
-      // Stop previous playback
-      cancel();
+      // 1. Immediately bind active state synchronously so UI shows Pause/Stop
+      if (id) {
+        setActiveId(id);
+      }
+      setIsSpeaking(true);
+      setIsPaused(false);
+
+      // Stop previous audio playback (without wiping the new activeId)
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+          audioRef.current = null;
+        } catch (_) {}
+      }
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        try {
+          window.speechSynthesis.cancel();
+        } catch (_) {}
+      }
 
       // Clean markdown symbols
       const cleanText = text
@@ -263,46 +288,17 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
         .trim();
 
       const { key, bcp } = resolveLanguage(cleanText, lang);
+      currentLangRef.current = key;
 
-      // Check if browser has a native voice installed for this language
-      const available = (typeof window !== 'undefined' && 'speechSynthesis' in window)
-        ? (window.speechSynthesis.getVoices() || voices)
-        : [];
-      
-      const hasNativeVoice = available.some((v) => {
-        const vLang = (v.lang || '').toLowerCase().replace('_', '-');
-        const vName = (v.name || '').toLowerCase();
-        if (key === 'hi') {
-          return vLang.startsWith('hi') || vName.includes('hindi') || vName.includes('swara') || vName.includes('madhur') || vName.includes('kalpana') || vName.includes('hemant');
-        }
-        if (key === 'te') {
-          return vLang.startsWith('te') || vName.includes('telugu') || vName.includes('mohan');
-        }
-        return vLang.startsWith('en');
-      });
-
-      // For Hindi and Telugu: Google Neural Audio Streamer provides 100% reliable pronunciation
-      // without requiring users to download Windows language packs.
-      if (key === 'hi' || key === 'te' || !hasNativeVoice) {
-        const chunks = chunkText(cleanText, 140);
-        setIsSpeaking(true);
-        setIsPaused(false);
-        playAudioChunks(
-          chunks,
-          key,
-          () => {
-            setIsSpeaking(false);
-            setIsPaused(false);
-            if (onEnd) onEnd();
-          },
-          () => speakNative(cleanText, bcp)
-        );
+      const chunks = chunkText(cleanText, 140);
+      if (chunks.length > 0) {
+        chunkQueueRef.current = [...chunks];
+        playNextChunk();
       } else {
-        // For English with installed native voices
         speakNative(cleanText, bcp);
       }
     },
-    [cancel, onEnd, playAudioChunks, speakNative, voices]
+    [playNextChunk, speakNative]
   );
 
   /** Pause active speech */
@@ -345,6 +341,7 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
   return {
     isSpeaking,
     isPaused,
+    activeId,
     voices,
     isSupported,
     speak,

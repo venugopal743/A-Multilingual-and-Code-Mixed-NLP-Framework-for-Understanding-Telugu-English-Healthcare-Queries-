@@ -80,7 +80,7 @@ export default function ChatMessage({
             <div className="mt-3.5 pt-3 border-t border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-2 text-xs">
               <div className="flex items-center gap-1.5">
                 {/* When this message is currently playing and active */}
-                {isCurrentAudio && isSpeaking ? (
+                {isCurrentAudio && (isSpeaking || isPaused) ? (
                   <>
                     {!isPaused ? (
                       <button

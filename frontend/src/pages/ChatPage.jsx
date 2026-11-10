@@ -39,6 +39,7 @@ export default function ChatPage() {
   const {
     isSpeaking,
     isPaused,
+    activeId,
     speak,
     pause,
     resume,
@@ -71,7 +72,7 @@ export default function ChatPage() {
   /** Speech Synthesis Handlers */
   const handleSpeak = (text, lang, id) => {
     setActiveSpeechId(id);
-    speak(text, lang);
+    speak(text, lang, id);
   };
 
   const handlePause = () => {
@@ -282,7 +283,7 @@ export default function ChatPage() {
               <ChatMessage
                 key={msg.id}
                 message={msg}
-                speechState={{ isSpeaking, isPaused, activeId: activeSpeechId }}
+                speechState={{ isSpeaking, isPaused, activeId: activeId || activeSpeechId }}
                 onSpeak={handleSpeak}
                 onPause={handlePause}
                 onResume={handleResume}
