@@ -1,0 +1,25 @@
+services:
+  # Node.js Express Backend Service
+  - type: web
+    name: medilingual-backend
+    runtime: node
+    plan: free
+    region: oregon
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: FRONTEND_URL
+        value: https://frontend-eight-silk-56.vercel.app
+      - key: JWT_SECRET
+        generateValue: true
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: 1000
+      - key: RATE_LIMIT_WINDOW_MS
+        value: 900000
