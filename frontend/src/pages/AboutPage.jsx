@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaHeartbeat,
+  FaGraduationCap,
+  FaCode,
   FaProjectDiagram,
   FaTable,
   FaDatabase,
@@ -24,6 +26,18 @@ export default function AboutPage() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('diagram'); // 'diagram', 'flowchart', 'table'
   const [selectedNode, setSelectedNode] = useState(null);
+  
+  const [sandboxSample, setSandboxSample] = useState({
+    id: 'tel_fever',
+    label: 'Tenglish: Fever Query',
+    input: 'naaku 2 days nunchi fever undi',
+    lang: 'Telugu-English (Tenglish)',
+    norm: 'నాకు 2 రోజుల నుండి జ్వరం ఉంది',
+    tokens: ['నాకు', '2', 'రోజు', '##ల', 'నుండి', 'జ్వరం', 'ఉంది'],
+    entities: ['DURATION: 2 days', 'SYMPTOM: Fever / Pyrexia']
+  });
+
+  
 
   const asciiDiagram = `                     PATIENT
                         │
@@ -188,7 +202,7 @@ export default function AboutPage() {
           <FaHeartbeat className="text-teal-600" />
           <span>Research & Engineering Blueprint</span>
         </div>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900">
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
           A Multilingual and Code-Mixed NLP Framework for Healthcare Queries
         </h1>
         <p className="mt-4 text-slate-600 text-sm sm:text-base leading-relaxed">
@@ -197,13 +211,13 @@ export default function AboutPage() {
         </p>
 
         {/* View Switcher Tabs */}
-        <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl mt-8 border border-slate-200">
+        <div className="inline-flex items-center p-1 bg-slate-100 rounded-xl mt-8 border border-slate-200 dark:border-slate-800">
           <button
             onClick={() => setActiveTab('diagram')}
             className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'diagram'
                 ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 dark:text-white'
             }`}
           >
             <span>🏛️ Architecture Pipeline Diagram</span>
@@ -213,7 +227,7 @@ export default function AboutPage() {
             className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'flowchart'
                 ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 dark:text-white'
             }`}
           >
             <FaProjectDiagram />
@@ -224,7 +238,7 @@ export default function AboutPage() {
             className={`flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
               activeTab === 'table'
                 ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                : 'text-slate-600 hover:text-slate-900 dark:text-white'
             }`}
           >
             <FaTable />
@@ -298,11 +312,11 @@ export default function AboutPage() {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-10 space-y-6"
+          className="bg-white rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-10 space-y-6"
         >
-          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Interactive Pipeline Cards</h2>
+              <h2 className="text-lg font-bold text-slate-900 dark:text-white">Interactive Pipeline Cards</h2>
               <p className="text-xs text-slate-500 mt-0.5">Click any stage to expand details</p>
             </div>
             <span className="text-xs font-mono bg-teal-50 text-teal-700 px-3 py-1 rounded-full border border-teal-200 font-bold">
@@ -332,7 +346,7 @@ export default function AboutPage() {
                         </div>
                         <div>
                           <span className="text-[10px] font-bold uppercase text-slate-500">{node.category}</span>
-                          <h3 className="text-sm font-bold text-slate-900">{node.title}</h3>
+                          <h3 className="text-sm font-bold text-slate-900 dark:text-white">{node.title}</h3>
                         </div>
                       </div>
                       <span className={`px-3 py-1 rounded-lg text-xs font-mono font-bold ${node.badgeColor}`}>
@@ -353,10 +367,10 @@ export default function AboutPage() {
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"
+          className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 shadow-sm overflow-hidden"
         >
-          <div className="p-6 border-b border-slate-100 bg-slate-50/60">
-            <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
+          <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60">
+            <h2 className="text-base font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
               <FaProjectDiagram className="text-teal-600" />
               <span>Target Architecture & Model Allocation</span>
             </h2>
@@ -367,7 +381,7 @@ export default function AboutPage() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
-              <thead className="bg-slate-100/70 text-slate-700 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200">
+              <thead className="bg-slate-100/70 text-slate-700 uppercase tracking-wider text-[11px] font-bold border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className="py-3 px-6">NLP Module</th>
                   <th className="py-3 px-6">Model</th>
@@ -377,7 +391,7 @@ export default function AboutPage() {
               <tbody className="divide-y divide-slate-100 text-slate-700">
                 {models.map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                    <td className="py-3.5 px-6 font-semibold text-slate-800">{row.module}</td>
+                    <td className="py-3.5 px-6 font-semibold text-slate-800 dark:text-slate-200">{row.module}</td>
                     <td className="py-3.5 px-6 font-mono text-teal-700 font-bold">{row.model}</td>
                     <td className="py-3.5 px-6 text-slate-600">{row.purpose}</td>
                   </tr>
@@ -390,8 +404,8 @@ export default function AboutPage() {
 
       {/* Datasets & Clinical Grounding */}
       <div className="grid md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 text-base mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 shadow-sm">
+          <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base mb-3 flex items-center gap-2">
             <FaDatabase className="text-teal-600" />
             <span>Curated Multilingual Datasets</span>
           </h3>
@@ -419,8 +433,8 @@ export default function AboutPage() {
           </ul>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-          <h3 className="font-bold text-slate-800 text-base mb-3 flex items-center gap-2">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 shadow-sm">
+          <h3 className="font-bold text-slate-800 dark:text-slate-200 text-base mb-3 flex items-center gap-2">
             <FaShieldAlt className="text-emerald-600" />
             <span>Safety, Explainability & Clinical Ethics</span>
           </h3>
@@ -443,6 +457,135 @@ export default function AboutPage() {
           </ul>
         </div>
       </div>
+
+      {/* 4. Interactive Indic Code-Mixed Transliteration & Normalization Sandbox */}
+      <div className="bg-white dark:bg-slate-900 p-6 sm:p-7 rounded-2xl border border-slate-200 dark:border-slate-800 dark:border-slate-800 shadow-sm space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-4">
+          <div>
+            <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+              <FaBrain className="text-teal-600" />
+              <span>Interactive Code-Mixed Transliteration & Normalization Sandbox</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Demonstrating the Indic NLP Library Normalizer and MuRIL Subword Tokenizer across Romanized queries.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono bg-teal-50 dark:bg-teal-950 text-teal-800 dark:text-teal-300 px-3 py-1 rounded-md font-bold border border-teal-200/60 dark:border-teal-800">
+            Live Tokenizer Inspector
+          </span>
+        </div>
+
+        {/* Sample Selection */}
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Select or Test Sample Code-Mixed Clinical Input:</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+            {[
+              {
+                id: 'tel_fever',
+                label: 'Tenglish: Fever Query',
+                input: 'naaku 2 days nunchi fever undi',
+                lang: 'Telugu-English (Tenglish)',
+                norm: 'నాకు 2 రోజుల నుండి జ్వరం ఉంది',
+                tokens: ['నాకు', '2', 'రోజు', '##ల', 'నుండి', 'జ్వరం', 'ఉంది'],
+                entities: ['DURATION: 2 days', 'SYMPTOM: Fever / Pyrexia']
+              },
+              {
+                id: 'hin_headache',
+                label: 'Hinglish: Headache Query',
+                input: 'mujhe kal se sar dard ho raha hai',
+                lang: 'Hindi-English (Hinglish)',
+                norm: 'मुझे कल से सिरदर्द हो रहा है',
+                tokens: ['मुझे', 'कल', 'से', 'सिर', '##दर्द', 'हो', 'रहा', 'है'],
+                entities: ['TIMELINE: Yesterday (कल)', 'SYMPTOM: Headache / Cephalea']
+              },
+              {
+                id: 'tel_joint',
+                label: 'Tenglish: Hip / Joint Query',
+                input: 'joint pain valla nadavadam kastam ga undi',
+                lang: 'Telugu-English (Tenglish)',
+                norm: 'కీళ్ల నొప్పి వల్ల నడవడం కష్టంగా ఉంది',
+                tokens: ['కీళ్ల', 'నొప్పి', 'వల్ల', 'నడవడం', 'కష్టంగా', 'ఉంది'],
+                entities: ['SYMPTOMS: Joint Pain, Difficulty in Walking']
+              },
+              {
+                id: 'tel_cancer',
+                label: 'Tenglish: Oncology Query',
+                input: 'naku cancer vachindhi',
+                lang: 'Telugu-English (Tenglish)',
+                norm: 'నాకు క్యాన్సర్ వచ్చింది',
+                tokens: ['నాకు', 'క్యాన్సర్', 'వచ్చింది'],
+                entities: ['CONDITION: Oncology Assessment', 'TRIAGE: Urgent Referral']
+              }
+            ].map((sample) => (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => setSandboxSample(sample)}
+                className={`p-3 text-left rounded-xl border text-xs transition-all ${
+                  sandboxSample.id === sample.id
+                    ? 'border-teal-600 bg-teal-50/70 text-teal-950 font-bold shadow-2xs'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 bg-slate-50/50 dark:bg-slate-800/50 text-slate-700'
+                }`}
+              >
+                <div className="font-semibold text-slate-800 dark:text-slate-200 text-[11px] mb-1">{sample.label}</div>
+                <div className="font-mono text-teal-700 dark:text-teal-400 text-[11px] truncate">{sample.input}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Live Transformation Visualizer */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          {/* Step 1: Input & Language ID */}
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 space-y-2 text-xs">
+            <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+              1. FastText & Script Profiler
+            </span>
+            <div className="font-mono text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 font-bold shadow-2xs">
+              "{sandboxSample.input}"
+            </div>
+            <div className="text-[11px] text-teal-700 dark:text-teal-400 font-semibold">
+              Detected: <span className="font-bold">{sandboxSample.lang}</span> (98.4% conf)
+            </div>
+          </div>
+
+          {/* Step 2: Indic NLP Normalizer */}
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 space-y-2 text-xs">
+            <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+              2. Indic NLP Script Normalizer
+            </span>
+            <div className="text-sm text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 font-bold shadow-2xs">
+              {sandboxSample.norm}
+            </div>
+            <div className="text-[11px] text-indigo-700 dark:text-indigo-400 font-semibold">
+              Canonical Indic Script Transliteration & Normalization
+            </div>
+          </div>
+
+          {/* Step 3: MuRIL Subword BPE & Bio-NER */}
+          <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/60 space-y-2 text-xs">
+            <span className="font-bold text-slate-500 uppercase tracking-wider text-[10px]">
+              3. MuRIL Subwords & Bio-NER
+            </span>
+            <div className="flex flex-wrap gap-1 bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-200 dark:border-slate-700 shadow-2xs">
+              {sandboxSample.tokens.map((tk, idx) => (
+                <span key={idx} className="font-mono text-[11px] bg-teal-50 dark:bg-teal-900/70 text-teal-800 dark:text-teal-200 px-1.5 py-0.5 rounded border border-teal-200/60 dark:border-teal-700 font-semibold">
+                  {tk}
+                </span>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1 pt-0.5">
+              {sandboxSample.entities.map((en, idx) => (
+                <span key={idx} className="text-[10px] font-bold bg-rose-50 dark:bg-rose-950/70 text-rose-800 dark:text-rose-200 px-2 py-0.5 rounded border border-rose-200/60 dark:border-rose-800">
+                  {en}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      
     </div>
   );
 }

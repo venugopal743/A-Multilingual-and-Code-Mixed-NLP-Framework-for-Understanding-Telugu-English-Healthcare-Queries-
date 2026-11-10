@@ -84,7 +84,7 @@ export default function HomePage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-900 tracking-tight max-w-4xl mx-auto leading-tight"
+            className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-slate-900 dark:text-white tracking-tight max-w-4xl mx-auto leading-tight"
           >
             Breaking Language Barriers in{' '}
             <span className="bg-gradient-to-r from-teal-600 to-sky-600 bg-clip-text text-transparent">
@@ -117,7 +117,7 @@ export default function HomePage() {
             </Link>
             <Link
               to="/about"
-              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 font-semibold text-sm sm:text-base shadow-sm transition-all"
+              className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 dark:border-slate-800 text-slate-700 font-semibold text-sm sm:text-base shadow-sm transition-all"
             >
               <span>Explore Architecture</span>
             </Link>
@@ -137,7 +137,7 @@ export default function HomePage() {
               initial={{ opacity: 0, scale: 0.95 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              className="bg-white border border-slate-200/80 rounded-2xl p-6 text-center shadow-sm hover:shadow-md transition-shadow"
+              className="bg-white border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 text-center shadow-sm hover:shadow-md transition-shadow"
             >
               <div className="text-3xl md:text-4xl font-extrabold text-teal-600 font-mono">
                 {stat.value}{stat.suffix}
@@ -152,7 +152,7 @@ export default function HomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-xs font-bold uppercase tracking-wider text-teal-600 mb-2">Core Capabilities</h2>
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900">
+          <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
             Engineered for Real-World Indian Healthcare
           </h3>
           <p className="mt-4 text-slate-600 text-sm sm:text-base">
@@ -165,12 +165,12 @@ export default function HomePage() {
           {features.map((feat, idx) => (
             <div
               key={idx}
-              className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group"
+              className="bg-white border border-slate-200 dark:border-slate-800/80 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all group"
             >
               <div className="w-12 h-12 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
                 <feat.icon className="text-xl" />
               </div>
-              <h4 className="text-lg font-bold text-slate-800 mb-2">{feat.title}</h4>
+              <h4 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2">{feat.title}</h4>
               <p className="text-sm text-slate-600 leading-relaxed">{feat.desc}</p>
             </div>
           ))}
@@ -182,7 +182,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center max-w-2xl mx-auto mb-12">
             <h2 className="text-xs font-bold uppercase tracking-wider text-teal-600 mb-2">Language Diversity</h2>
-            <h3 className="text-3xl font-extrabold text-slate-900">Native & Code-Mixed Query Support</h3>
+            <h3 className="text-3xl font-extrabold text-slate-900 dark:text-white">Native & Code-Mixed Query Support</h3>
             <p className="mt-3 text-sm text-slate-600">
               Patients speak naturally. Here are real examples processed with token-level language identification:
             </p>
@@ -190,14 +190,14 @@ export default function HomePage() {
 
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {CODE_MIXED_EXAMPLES.slice(0, 4).map((ex, idx) => (
-              <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+              <div key={idx} className="bg-white p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-md">
                     {ex.language}
                   </span>
                   <FaCheckCircle className="text-teal-500 text-xs" />
                 </div>
-                <p className="text-sm font-semibold text-slate-800 italic mb-2">"{ex.text}"</p>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 italic mb-2">"{ex.text}"</p>
                 <p className="text-xs text-slate-500">
                   <strong className="text-slate-700 font-medium">English Translation:</strong> {ex.translation}
                 </p>
@@ -211,7 +211,7 @@ export default function HomePage() {
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-xs font-bold uppercase tracking-wider text-teal-600 mb-2">Architecture Pipeline</h2>
-          <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900">
+          <h3 className="text-3xl sm:text-4xl font-extrabold text-slate-900 dark:text-white">
             How MediLingual Processes Queries
           </h3>
           <p className="mt-4 text-slate-600 text-sm sm:text-base">
@@ -225,8 +225,8 @@ export default function HomePage() {
               <div className="absolute -left-[35px] md:-left-[51px] top-1.5 w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center text-xs shadow-md group-hover:scale-110 transition-transform">
                 <step.icon />
               </div>
-              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm max-w-2xl">
-                <h4 className="font-bold text-slate-800 text-base">{step.title}</h4>
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-sm max-w-2xl">
+                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-base">{step.title}</h4>
                 <p className="text-sm text-slate-600 mt-1">{step.desc}</p>
               </div>
             </div>

@@ -40,8 +40,8 @@ async def chat_pipeline_endpoint(payload: ChatRequest):
     if not target_lang or target_lang == "auto":
         target_lang = detected_lang
 
-    # Step 3: Medical NER
-    ner_result = ner_service.extract_entities(payload.text, detected_lang)
+    # Step 3: Medical NER with target language localization
+    ner_result = ner_service.extract_entities(payload.text, target_lang)
 
     # Step 4: Intent Classification
     intent_result = intent_service.classify_intent(payload.text, detected_lang)

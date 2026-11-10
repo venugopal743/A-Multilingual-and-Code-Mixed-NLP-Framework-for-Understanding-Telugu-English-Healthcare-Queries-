@@ -1,3 +1,4 @@
+import { useAppContext } from './context/AppContext';
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/layout/Navbar';
@@ -8,10 +9,13 @@ import DashboardPage from './pages/DashboardPage';
 import AboutPage from './pages/AboutPage';
 
 export default function App() {
+    const { theme } = useAppContext();
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800 font-sans selection:bg-teal-500 selection:text-white">
+    <div className={`min-h-screen flex flex-col font-sans transition-colors duration-200 ${
+      theme === 'dark' ? 'bg-slate-950 text-slate-100 dark' : 'bg-slate-50 text-slate-800'
+    } selection:bg-teal-500 selection:text-white`}>
       <Navbar />
-      <main className="flex-grow">
+      <main className="flex-grow pt-16 sm:pt-20">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/chat" element={<ChatPage />} />

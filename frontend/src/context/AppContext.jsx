@@ -4,7 +4,7 @@
  *              Manages user info, language selection, chat history, and theme.
  */
 
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { createContext, useContext, useReducer, useCallback, useEffect } from 'react';
 import { generateId } from '../utils/helpers';
 import { SAMPLE_QUERIES } from '../utils/constants';
 
@@ -18,7 +18,7 @@ const initialState = {
   codeMixedMode: false,
   chatHistory: [],
   analysisData: null,
-  theme: 'light',
+  theme: typeof window !== 'undefined' ? localStorage.getItem('medilingual_theme') || 'light' : 'light',
   isSidebarOpen: true,
   isLoading: false,
 };
@@ -101,10 +101,27 @@ export function AppProvider({ children }) {
     dispatch({ type: ACTIONS.CLEAR_CHAT });
   }, []);
 
-  const setTheme = useCallback((theme) => {
-    dispatch({ type: ACTIONS.SET_THEME, payload: theme });
-    document.documentElement.classList.toggle('dark', theme === 'dark');
+  const setTheme = useCallback((newTheme) => {
+    dispatch({ type: ACTIONS.SET_THEME, payload: newTheme });
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', newTheme === 'dark');
+    }
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('medilingual_theme', newTheme);
+    }
   }, []);
+
+  const toggleTheme = useCallback(() => {
+    const next = state.theme === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+  }, [state.theme, setTheme]);
+
+  // Sync dark class on mount and theme state change
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', state.theme === 'dark');
+    }
+  }, [state.theme]);
 
   const toggleSidebar = useCallback(() => {
     dispatch({ type: ACTIONS.TOGGLE_SIDEBAR });
@@ -161,6 +178,7 @@ export function AppProvider({ children }) {
     setAnalysis,
     clearChat,
     setTheme,
+    toggleTheme,
     toggleSidebar,
     setLoading,
     sendChatQuery,
