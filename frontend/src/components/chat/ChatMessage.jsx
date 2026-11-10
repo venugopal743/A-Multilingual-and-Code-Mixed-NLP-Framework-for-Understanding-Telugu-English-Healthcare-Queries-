@@ -1,11 +1,10 @@
-import React from 'react';
+﻿import React from 'react';
 import { motion } from 'framer-motion';
 import {
   FaUser,
   FaUserMd,
   FaVolumeUp,
   FaCheckCircle,
-  FaShieldAlt,
   FaNotesMedical,
   FaPause,
   FaPlay,
@@ -143,15 +142,9 @@ export default function ChatMessage({
             </div>
           )}
         </div>
-
-        {/* Clinical Safety Notice */}
-        {!isUser && (
-          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-slate-500 px-1">
-            <FaShieldAlt className="text-teal-600 text-[10px]" />
-            <span>Clinical decision support. For medical emergencies or definitive diagnosis, consult a certified physician.</span>
-          </div>
-        )}
       </div>
     </motion.div>
   );
 }
+
+
