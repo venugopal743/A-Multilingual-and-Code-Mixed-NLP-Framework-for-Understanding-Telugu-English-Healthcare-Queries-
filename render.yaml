@@ -1,5 +1,33 @@
 services:
-  # Node.js Express Backend Service
+  # ============================================================================
+  # 1. Frontend Static Site (React 18 + Vite + Tailwind CSS)
+  # Free tier on Render: Unlimited bandwidth, global CDN, instant deployments
+  # ============================================================================
+  - type: web
+    name: medilingual-ai-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Cache-Control
+        value: public, max-age=0, must-revalidate
+    envVars:
+      - key: VITE_API_URL
+        value: https://medilingual-backend.onrender.com/api
+      - key: VITE_NLP_URL
+        value: https://medilingual-nlp-engine.onrender.com/api
+
+  # ============================================================================
+  # 2. Node.js Express Backend Service
+  # Handles EHR exports, clinical session logging, and fallback triage
+  # ============================================================================
   - type: web
     name: medilingual-backend
     runtime: node
@@ -7,7 +35,7 @@ services:
     region: oregon
     rootDir: backend
     buildCommand: npm install
-    startCommand: npm start
+    startCommand: node src/server.js
     healthCheckPath: /health
     autoDeploy: true
     envVars:
@@ -15,11 +43,29 @@ services:
         value: production
       - key: PORT
         value: 10000
-      - key: FRONTEND_URL
-        value: https://frontend-eight-silk-56.vercel.app
       - key: JWT_SECRET
         generateValue: true
       - key: RATE_LIMIT_MAX_REQUESTS
         value: 1000
       - key: RATE_LIMIT_WINDOW_MS
         value: 900000
+
+  # ============================================================================
+  # 3. Python FastAPI NLP Engine
+  # Clinical NER, MuRIL / XLM-R Language Identification & FAISS RAG Retrieval
+  # ============================================================================
+  - type: web
+    name: medilingual-nlp-engine
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: nlp-engine
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.11.0

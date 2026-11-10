@@ -3,6 +3,8 @@
 [![Framework](https://img.shields.io/badge/Architecture-FastAPI%20%7C%20Node.js%20%7C%20React-teal)](https://github.com)
 [![Languages](https://img.shields.io/badge/Languages-Telugu%20%7C%20Hindi%20%7C%20English%20%7C%20Code--Mixed-blue)](#)
 [![Models](https://img.shields.io/badge/Models-FastText%20%7C%20MuRIL%20%7C%20XLM--RoBERTa%20%7C%20FAISS-emerald)](#)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/venugopal743/A-Multilingual-and-Code-Mixed-NLP-Framework-for-Understanding-Telugu-English-Healthcare-Queries-)
+[![Render](https://img.shields.io/badge/Deploy%20on-Render-46E3B7?style=flat&logo=render&logoColor=white)](https://render.com)
 
 A clinical natural language processing framework built to understand patient inquiries in **Telugu**, **Hindi**, **English**, and **Romanized Code-Mixed dialects** (e.g., Telugu-English *"Naaku 2 days nunchi fever undi"*, Hindi-English *"Mujhe kal se sar dard hai"*).
 
@@ -120,11 +122,34 @@ multilingual-healthcare-nlp/
 │   ├── telugu/                   # medical_data_telugu.csv
 │   └── code_mixed/               # Synthetic & real code-mixed clinical queries
 │
+├── render.yaml                   # Render Blueprint (Infrastructure-as-Code)
 ├── docker-compose.yml            # Multi-container orchestration
 └── README.md
 ```
 
 ---
+
+---
+
+## ☁️ Deployment on Render
+
+This repository includes a production-ready **Render Blueprint (`render.yaml`)** to deploy the full stack automatically to [Render](https://render.com):
+
+| Service | Type | Path | Runtime | Description |
+|---|---|---|---|---|
+| **`medilingual-ai-frontend`** | Static Site | `/frontend` | Static (Vite) | Global CDN, SPA rewrite routing, instant load |
+| **`medilingual-backend`** | Web Service | `/backend` | Node.js (Express) | Patient session logging, EHR export, health check |
+| **`medilingual-nlp-engine`** | Web Service | `/nlp-engine` | Python (FastAPI) | Clinical NER, MuRIL/XLM-R language identification, FAISS |
+
+### One-Click Deploy to Render
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/venugopal743/A-Multilingual-and-Code-Mixed-NLP-Framework-for-Understanding-Telugu-English-Healthcare-Queries-)
+
+### Step-by-Step Render Deployment:
+1. Log in to your [Render Dashboard](https://dashboard.render.com/).
+2. Click **New +** in the top navigation and select **Blueprint**.
+3. Connect your repository: `venugopal743/A-Multilingual-and-Code-Mixed-NLP-Framework-for-Understanding-Telugu-English-Healthcare-Queries-`.
+4. Render will automatically read `render.yaml` and configure all 3 services.
+5. Click **Apply** to deploy your live healthcare NLP system with zero configuration!
 
 ## 🚀 Quickstart Guide
 
