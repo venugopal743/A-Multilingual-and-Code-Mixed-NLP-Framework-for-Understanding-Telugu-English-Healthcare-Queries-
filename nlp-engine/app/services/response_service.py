@@ -1,4 +1,4 @@
-﻿"""
+"""
 Response Generation and Explainability Service.
 Synthesizes NER entities, intent, and RAG clinical records into grounded,
 multilingual healthcare responses in Telugu, Hindi, or English.
@@ -7,9 +7,9 @@ multilingual healthcare responses in Telugu, Hindi, or English.
 from typing import Dict, Any, List
 
 SAFETY_DISCLAIMERS = {
-    "te": "\n\nâš ï¸ à°—à°®à°¨à°¿à°•: à°‡à°¦à°¿ à°•à±‡à°µà°²à°‚ à°¸à°®à°¾à°šà°¾à°° à°ªà±à°°à°¯à±‹à°œà°¨à°¾à°² à°•à±‹à°¸à°‚ à°°à±‚à°ªà±Šà°‚à°¦à°¿à°‚à°šà°¬à°¡à°¿à°¨ AI à°®à°¾à°°à±à°—à°¦à°°à±à°¶à°•à°¤à±à°µà°‚. à°–à°šà±à°šà°¿à°¤à°®à±ˆà°¨ à°¨à°¿à°°à±à°§à°¾à°°à°£ à°²à±‡à°¦à°¾ à°…à°¤à±à°¯à°µà°¸à°° à°ªà°°à°¿à°¸à±à°¥à°¿à°¤à±à°²à±à°²à±‹ à°¦à°¯à°šà±‡à°¸à°¿ à°…à°°à±à°¹à°¤ à°•à°²à°¿à°—à°¿à°¨ à°µà±ˆà°¦à±à°¯à±à°¡à°¿à°¨à°¿ à°¸à°‚à°ªà±à°°à°¦à°¿à°‚à°šà°‚à°¡à°¿.",
-    "hi": "\n\nâš ï¸ à¤…à¤¸à¥à¤µà¥€à¤•à¤°à¤£: à¤¯à¤¹ à¤•à¥‡à¤µà¤² à¤¸à¥‚à¤šà¤¨à¤¾à¤¤à¥à¤®à¤• à¤®à¤¾à¤°à¥à¤—à¤¦à¤°à¥à¤¶à¤¨ à¤¹à¥ˆà¥¤ à¤•à¤¿à¤¸à¥€ à¤­à¥€ à¤šà¤¿à¤•à¤¿à¤¤à¥à¤¸à¥€à¤¯ à¤¸à¥à¤¥à¤¿à¤¤à¤¿, à¤¸à¤Ÿà¥€à¤• à¤¨à¤¿à¤¦à¤¾à¤¨ à¤¯à¤¾ à¤†à¤ªà¤¾à¤¤ à¤¸à¥à¤¥à¤¿à¤¤à¤¿ à¤®à¥‡à¤‚ à¤•à¥ƒà¤ªà¤¯à¤¾ à¤¯à¥‹à¤—à¥à¤¯ à¤šà¤¿à¤•à¤¿à¤¤à¥à¤¸à¤• à¤¸à¥‡ à¤ªà¤°à¤¾à¤®à¤°à¥à¤¶ à¤²à¥‡à¤‚à¥¤",
-    "en": "\n\nâš ï¸ Disclaimer: This information is AI-generated for educational guidance only and does not substitute professional medical diagnosis or prescription. Consult a healthcare provider if symptoms persist or worsen."
+    "te": "\n\n⚠️ గమనిక: ఇది కేవలం సమాచార ప్రయోజనాల కోసం రూపొందించబడిన AI మార్గదర్శకత్వం. ఖచ్చితమైన నిర్ధారణ లేదా అత్యవసర పరిస్థితుల్లో దయచేసి అర్హత కలిగిన వైద్యుడిని సంప్రదించండి.",
+    "hi": "\n\n⚠️ अस्वीकरण: यह केवल सूचनात्मक मार्गदर्शन है। किसी भी चिकित्सीय स्थिति, सटीक निदान या आपात स्थिति में कृपया योग्य चिकित्सक से परामर्श लें।",
+    "en": "\n\n⚠️ Disclaimer: This information is AI-generated for educational guidance only and does not substitute professional medical diagnosis or prescription. Consult a healthcare provider if symptoms persist or worsen."
 }
 
 
@@ -54,7 +54,7 @@ class ResponseService:
         else:
             response_text = self._build_english_response(symptoms, diseases, medicines, durations, intent, retrieved_docs)
 
-        # Safety disclaimer shown in UI footer; not appended to response text
+        # Safety disclaimer omitted per user request
 
         # Explainability narrative
         explanation = (
@@ -71,37 +71,37 @@ class ResponseService:
         }
 
     def _build_telugu_response(self, symptoms, diseases, medicines, durations, intent, docs) -> str:
-        symptom_str = ", ".join(symptoms) if symptoms else "à°®à±€à°°à± à°¤à±†à°²à°¿à°ªà°¿à°¨ à°²à°•à±à°·à°£à°¾à°²à±"
-        dur_str = f" ({durations[0]} à°¨à±à°‚à°¡à°¿)" if durations else ""
+        symptom_str = ", ".join(symptoms) if symptoms else "మీరు తెలిపిన లక్షణాలు"
+        dur_str = f" ({durations[0]} నుండి)" if durations else ""
 
         if intent == "emergency_assistance":
-            return f"ðŸš¨ à°…à°¤à±à°¯à°µà°¸à°° à°¹à±†à°šà±à°šà°°à°¿à°•: à°®à±€à°°à± à°¤à±†à°²à°¿à°ªà°¿à°¨ à°²à°•à±à°·à°£à°¾à°²à± ({symptom_str}) à°¤à°•à±à°·à°£ à°µà±ˆà°¦à±à°¯ à°¸à°¹à°¾à°¯à°‚ à°…à°µà°¸à°°à°®à°¯à±à°¯à±‡ à°ªà°°à°¿à°¸à±à°¥à°¿à°¤à°¿à°¨à°¿ à°¸à±‚à°šà°¿à°‚à°šà°µà°šà±à°šà±. à°¦à°¯à°šà±‡à°¸à°¿ à°µà±†à°‚à°Ÿà°¨à±‡ à°¸à°®à±€à°ªà°‚à°²à±‹à°¨à°¿ à°…à°¤à±à°¯à°µà°¸à°° à°µà°¿à°­à°¾à°—à°¾à°¨à°¿à°•à°¿ (Emergency/Ambulance 108) à°•à°¾à°²à± à°šà±‡à°¯à°‚à°¡à°¿."
+            return f"🚨 అత్యవసర హెచ్చరిక: మీరు తెలిపిన లక్షణాలు ({symptom_str}) తక్షణ వైద్య సహాయం అవసరమయ్యే పరిస్థితిని సూచించవచ్చు. దయచేసి వెంటనే సమీపంలోని అత్యవసర విభాగానికి (Emergency/Ambulance 108) కాల్ చేయండి."
 
         if intent == "hospital_search":
-            return f"à°®à±€ à°¸à°®à±€à°ªà°‚à°²à±‹ à°†à°¸à±à°ªà°¤à±à°°à±à°²à± à°²à±‡à°¦à°¾ à°¸à±à°ªà±†à°·à°²à°¿à°¸à±à°Ÿà± à°µà±ˆà°¦à±à°¯à±à°² à°¸à°‚à°ªà±à°°à°¦à°¿à°‚à°ªà±à°² à°•à±‹à°¸à°‚, à°ªà±à°°à°­à±à°¤à±à°µ à°œà°¿à°²à±à°²à°¾ à°†à°¸à±à°ªà°¤à±à°°à°¿ à°²à±‡à°¦à°¾ à°¸à°®à±€à°ªà°‚à°²à±‹à°¨à°¿ à°…à°§à±€à°•à±ƒà°¤ à°•à±à°²à°¿à°¨à°¿à°•à±â€Œà°¨à± à°¸à°‚à°ªà±à°°à°¦à°¿à°‚à°šà°‚à°¡à°¿."
+            return f"మీ సమీపంలో ఆసుపత్రులు లేదా స్పెషలిస్ట్ వైద్యుల సంప్రదింపుల కోసం, ప్రభుత్వ జిల్లా ఆసుపత్రి లేదా సమీపంలోని అధీకృత క్లినిక్‌ను సంప్రదించండి."
 
-        text = f"à°®à±€à°°à± à°ªà±‡à°°à±à°•à±Šà°¨à±à°¨ à°²à°•à±à°·à°£à°¾à°²à±: {symptom_str}{dur_str}.\n"
+        text = f"మీరు పేర్కొన్న లక్షణాలు: {symptom_str}{dur_str}.\n"
         if docs:
-            text += f"à°•à±à°²à°¿à°¨à°¿à°•à°²à± à°®à°¾à°°à±à°—à°¦à°°à±à°¶à°•à°¾à°² à°ªà±à°°à°•à°¾à°°à°‚, à°µà°¿à°¶à±à°°à°¾à°‚à°¤à°¿ à°¤à±€à°¸à±à°•à±‹à°µà°¡à°‚, à°¸à°®à±ƒà°¦à±à°§à°¿à°—à°¾ à°¨à±€à°°à± à°¤à°¾à°—à°¡à°‚ à°®à°°à°¿à°¯à± à°¤à±€à°µà±à°°à°®à±ˆà°¨ à°¶à°¾à°°à±€à°°à°• à°¶à±à°°à°®à°¨à± à°¨à°¿à°µà°¾à°°à°¿à°‚à°šà°¡à°‚ à°¸à±‚à°šà°¿à°‚à°šà°¬à°¡à°¿à°‚à°¦à°¿."
+            text += f"క్లినికల్ మార్గదర్శకాల ప్రకారం, విశ్రాంతి తీసుకోవడం, సమృద్ధిగా నీరు తాగడం మరియు తీవ్రమైన శారీరక శ్రమను నివారించడం సూచించబడింది."
         else:
-            text += "à°®à±€ à°²à°•à±à°·à°£à°¾à°² à°†à°§à°¾à°°à°‚à°—à°¾ à°œà±€à°µà°¨à°¶à±ˆà°²à°¿ à°®à°¾à°°à±à°ªà±à°²à± à°®à°°à°¿à°¯à± à°µà°¿à°¶à±à°°à°¾à°‚à°¤à°¿ à°…à°µà°¸à°°à°‚."
+            text += "మీ లక్షణాల ఆధారంగా జీవనశైలి మార్పులు మరియు విశ్రాంతి అవసరం."
         return text
 
     def _build_hindi_response(self, symptoms, diseases, medicines, durations, intent, docs) -> str:
-        symptom_str = ", ".join(symptoms) if symptoms else "à¤¬à¤¤à¤¾à¤ à¤—à¤ à¤²à¤•à¥à¤·à¤£"
-        dur_str = f" ({durations[0]} à¤¸à¥‡)" if durations else ""
+        symptom_str = ", ".join(symptoms) if symptoms else "बताए गए लक्षण"
+        dur_str = f" ({durations[0]} से)" if durations else ""
 
         if intent == "emergency_assistance":
-            return f"ðŸš¨ à¤†à¤ªà¤¾à¤¤à¤•à¤¾à¤²à¥€à¤¨ à¤šà¥‡à¤¤à¤¾à¤µà¤¨à¥€: à¤†à¤ªà¤•à¥‡ à¤²à¤•à¥à¤·à¤£ ({symptom_str}) à¤—à¤‚à¤­à¥€à¤° à¤¹à¥‹ à¤¸à¤•à¤¤à¥‡ à¤¹à¥ˆà¤‚à¥¤ à¤•à¥ƒà¤ªà¤¯à¤¾ à¤¤à¥à¤°à¤‚à¤¤ à¤¨à¤œà¤¦à¥€à¤•à¥€ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤² à¤•à¥‡ à¤†à¤ªà¤¾à¤¤à¤•à¤¾à¤²à¥€à¤¨ à¤µà¤¿à¤­à¤¾à¤— à¤¯à¤¾ à¤à¤®à¥à¤¬à¥à¤²à¥‡à¤‚à¤¸ (108/102) à¤¸à¥‡ à¤¸à¤‚à¤ªà¤°à¥à¤• à¤•à¤°à¥‡à¤‚à¥¤"
+            return f"🚨 आपातकालीन चेतावनी: आपके लक्षण ({symptom_str}) गंभीर हो सकते हैं। कृपया तुरंत नजदीकी अस्पताल के आपातकालीन विभाग या एम्बुलेंस (108/102) से संपर्क करें।"
 
         if intent == "hospital_search":
-            return f"à¤¨à¤œà¤¦à¥€à¤•à¥€ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤² à¤¯à¤¾ à¤µà¤¿à¤¶à¥‡à¤·à¤œà¥à¤ž à¤šà¤¿à¤•à¤¿à¤¤à¥à¤¸à¤• à¤•à¥€ à¤œà¤¾à¤¨à¤•à¤¾à¤°à¥€ à¤•à¥‡ à¤²à¤¿à¤ à¤•à¥ƒà¤ªà¤¯à¤¾ à¤¸à¥à¤¥à¤¾à¤¨à¥€à¤¯ à¤¸à¥à¤µà¤¾à¤¸à¥à¤¥à¥à¤¯ à¤•à¥‡à¤‚à¤¦à¥à¤° à¤¯à¤¾ à¤œà¤¿à¤²à¤¾ à¤…à¤¸à¥à¤ªà¤¤à¤¾à¤² à¤¸à¥‡ à¤¸à¤‚à¤ªà¤°à¥à¤• à¤•à¤°à¥‡à¤‚à¥¤"
+            return f"नजदीकी अस्पताल या विशेषज्ञ चिकित्सक की जानकारी के लिए कृपया स्थानीय स्वास्थ्य केंद्र या जिला अस्पताल से संपर्क करें।"
 
-        text = f"à¤†à¤ªà¤•à¥‡ à¤¦à¥à¤µà¤¾à¤°à¤¾ à¤¬à¤¤à¤¾à¤ à¤—à¤ à¤²à¤•à¥à¤·à¤£: {symptom_str}{dur_str}à¥¤\n"
+        text = f"आपके द्वारा बताए गए लक्षण: {symptom_str}{dur_str}।\n"
         if docs:
-            text += f"à¤šà¤¿à¤•à¤¿à¤¤à¥à¤¸à¥€à¤¯ à¤°à¤¿à¤•à¥‰à¤°à¥à¤¡ à¤”à¤° RAG à¤œà¥à¤žà¤¾à¤¨à¤•à¥‹à¤· à¤•à¥‡ à¤…à¤¨à¥à¤¸à¤¾à¤°, à¤ªà¤°à¥à¤¯à¤¾à¤ªà¥à¤¤ à¤†à¤°à¤¾à¤®, à¤¤à¤°à¤² à¤ªà¤¦à¤¾à¤°à¥à¤¥à¥‹à¤‚ à¤•à¤¾ à¤¸à¥‡à¤µà¤¨ à¤”à¤° à¤¦à¤°à¥à¤¦ à¤¨à¤¿à¤µà¤¾à¤°à¤£ à¤•à¥‡ à¤²à¤¿à¤ à¤¡à¥‰à¤•à¥à¤Ÿà¤° à¤•à¥€ à¤¸à¤²à¤¾à¤¹ à¤†à¤µà¤¶à¥à¤¯à¤• à¤¹à¥ˆà¥¤"
+            text += f"चिकित्सीय रिकॉर्ड और RAG ज्ञानकोष के अनुसार, पर्याप्त आराम, तरल पदार्थों का सेवन और दर्द निवारण के लिए डॉक्टर की सलाह आवश्यक है।"
         else:
-            text += "à¤²à¤•à¥à¤·à¤£à¥‹à¤‚ à¤•à¥‹ à¤¨à¤¿à¤¯à¤‚à¤¤à¥à¤°à¤¿à¤¤ à¤•à¤°à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ à¤†à¤°à¤¾à¤® à¤”à¤° à¤¸à¤‚à¤¤à¥à¤²à¤¿à¤¤ à¤¦à¤¿à¤¨à¤šà¤°à¥à¤¯à¤¾ à¤…à¤ªà¤¨à¤¾à¤à¤‚à¥¤"
+            text += "लक्षणों को नियंत्रित करने के लिए आराम और संतुलित दिनचर्या अपनाएं।"
         return text
 
     def _build_english_response(self, symptoms, diseases, medicines, durations, intent, docs) -> str:
@@ -109,7 +109,7 @@ class ResponseService:
         dur_str = f" (duration: {durations[0]})" if durations else ""
 
         if intent == "emergency_assistance":
-            return f"ðŸš¨ Emergency Alert: Your query indicates potentially acute red-flag symptoms ({symptom_str}). Please call local emergency medical services (e.g. 108 / 911) or visit the nearest emergency room immediately."
+            return f"🚨 Emergency Alert: Your query indicates potentially acute red-flag symptoms ({symptom_str}). Please call local emergency medical services (e.g. 108 / 911) or visit the nearest emergency room immediately."
 
         if intent == "hospital_search":
             return f"To locate the nearest qualified medical centers or specialized orthopedic/general departments, consider visiting your local primary healthcare center or district hospital."
@@ -117,11 +117,10 @@ class ResponseService:
         text = f"Clinical Assessment for {symptom_str}{dur_str}:\n"
         if docs:
             primary_snippet = docs[0].get("text", "")
-            text += f"Based on verified medical guidelines:\nâ€¢ Recommended care includes rest, symptom monitoring, and avoiding heavy physical exertion.\nâ€¢ Relevant Clinical Context: {primary_snippet[:160]}..."
+            text += f"Based on verified medical guidelines:\n• Recommended care includes rest, symptom monitoring, and avoiding heavy physical exertion.\n• Relevant Clinical Context: {primary_snippet[:160]}..."
         else:
             text += "Adequate hydration, proper rest, and careful monitoring of symptom progression are recommended."
         return text
 
 
 response_service = ResponseService()
-
