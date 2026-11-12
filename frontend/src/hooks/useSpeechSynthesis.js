@@ -52,8 +52,6 @@ export function stopAllAudio() {
   if ('speechSynthesis' in window) {
     try {
       window.speechSynthesis.cancel();
-      window.speechSynthesis.pause();
-      window.speechSynthesis.cancel();
     } catch (_) {}
   }
 
@@ -174,6 +172,14 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
 
   const isPausedRef = useRef(false);
 
+  // Keep the latest onEnd in a ref so `cancel` stays stable across renders.
+  // (An inline onEnd from the parent used to recreate `cancel` on every render,
+  // which re-ran the unmount effect below and killed speech ~1ms after it started.)
+  const onEndRef = useRef(onEnd);
+  useEffect(() => {
+    onEndRef.current = onEnd;
+  }, [onEnd]);
+
   // Initialize browser speech voices
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -201,8 +207,8 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     setIsSpeaking(false);
     setIsPaused(false);
     setActiveId(null);
-    if (onEnd) onEnd();
-  }, [onEnd]);
+    if (onEndRef.current) onEndRef.current();
+  }, []);
 
   /** Pause active playback */
   const pause = useCallback(() => {
@@ -257,9 +263,8 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       };
 
       utterance.onerror = (e) => {
-        if (e.error === 'interrupted' || e.error === 'canceled') {
-          if (isPausedRef.current || window.__IS_MEDILINGUAL_PAUSED__) return;
-        }
+        // 'interrupted' / 'canceled' only happen when we stopped speech ourselves
+        if (e.error === 'interrupted' || e.error === 'canceled') return;
         cancel();
       };
 
@@ -271,6 +276,8 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
       };
 
       try {
+        // Chrome can be left in a paused state by an earlier pause(); un-stick it
+        if (window.speechSynthesis.paused) window.speechSynthesis.resume();
         window.speechSynthesis.speak(utterance);
       } catch (_) {
         cancel();
@@ -349,12 +356,12 @@ export function useSpeechSynthesis({ rate = 0.95, pitch = 1, onEnd } = {}) {
     [cancel, playWebSpeech, voices]
   );
 
-  // Stop on component unmount
+  // Stop on component unmount ONLY (empty deps — must not re-run on re-render)
   useEffect(() => {
     return () => {
-      cancel();
+      stopAllAudio();
     };
-  }, [cancel]);
+  }, []);
 
   return {
     isSpeaking,
