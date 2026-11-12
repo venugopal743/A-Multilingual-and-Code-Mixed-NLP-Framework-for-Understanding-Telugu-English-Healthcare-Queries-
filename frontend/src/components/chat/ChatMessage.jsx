@@ -45,8 +45,6 @@ export default function ChatMessage({
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       try {
         window.speechSynthesis.cancel();
-        window.speechSynthesis.pause();
-        window.speechSynthesis.cancel();
       } catch (_) {}
     }
 
